@@ -1,4 +1,4 @@
-HELP.md
+catalog-service/HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -31,3 +31,16 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# macOS
+.DS_Store
+
+# IntelliJ / IDEA
+.idea/
+
+# Maven
+*.log
+
+# System
+Thumbs.db
+
