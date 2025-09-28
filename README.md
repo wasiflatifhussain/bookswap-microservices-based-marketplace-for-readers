@@ -80,29 +80,26 @@ Welcome to **BookSwap** – a smart trade marketplace for readers to swap novels
 
 _Owns: books (business states: `DRAFT → LISTED → UNLISTED (SWAPPED OWNER_ACTION)`)_
 
-- **POST** `/catalog/books`  
+- **POST** `/api/catalog/books`  
   Create a new book entry (state = DRAFT).  
   _Emits:_ `book.created`  
   _Returns:_ book object with `book_id`, `state`, `metadata`.
 
-- **POST** `/catalog/books/{bookId}/unlist`  
+- **DELETE** `/api/catalog/books/{bookId}`  
   Unlists a book (logical delete → UNLISTED).  
   _Emits:_ `book.unlisted`  
   _Returns:_ `{ book_id, state: "UNLISTED", reason }`
 
-- **GET** `/catalog/books/{bookId}`  
+- **GET** `/api/catalog/books/{bookId}`  
   Fetch one book (with media URLs + valuation if ready).  
   _Returns:_ full book detail object.
 
-- **GET** `/catalog/books?...`  
-  Paginated list with optional filters (`query`, `genre`, `owner`, `state`, `minCoins`, `maxCoins`).  
-  _Returns:_ `{ items: [...], next_cursor }`
 
-- **GET** `/catalog/books/recent?limit=20`  
+- **GET** `/api/catalog/books/recent?limit=20`  
   Most recent LISTED books for homepage feed.  
   _Returns:_ `{ items: [...] }`
 
-- **GET** `/catalog/books/match-candidates?my_book_id={id}&tolerance=0.15`  
+- **GET** `/api/catalog/books/matches?book-id={id}&tolerance=0.15`  
   Suggests books from others with similar valuation to `my_book`.  
   _Returns:_ `{ my_book_id, valuation_coins, items: [...], next_cursor }`
 
