@@ -96,15 +96,15 @@ _Owns: books (business states: `DRAFT → LISTED → UNLISTED (SWAPPED OWNER_ACT
 
 - **GET** `/api/catalog/books/user/{userId}`  
   Fetch list of books (with media URLs + valuation if ready) for that userId.  
-  _Returns:_ full list of book detail object.
+  _Returns:_ full list of book detail objects.
 
 - **GET** `/api/catalog/books/recent?limit=20`  
   Most recent LISTED books for homepage feed.  
-  _Returns:_ `{ items: [...] }`
+  _Returns: List of book detail objects.
 
 - **GET** `/api/catalog/books/matches?book-id={id}&tolerance=0.15`  
-  Suggests books from others with similar valuation to `my_book`.  
-  _Returns:_ `{ my_book_id, valuation_coins, items: [...], next_cursor }`
+  Suggests books from others with similar valuation to book-id value.  
+  _Returns:_ List of book detail objects.
 
 ---
 
