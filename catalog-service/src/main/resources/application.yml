@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: catalog-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookswap_catalog_db
+    username: wasiflatifhussain
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  output:
+    ansi:
+      enabled: ALWAYS
+
+server:
+  port: 8081
