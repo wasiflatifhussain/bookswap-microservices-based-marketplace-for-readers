@@ -94,6 +94,9 @@ _Owns: books (business states: `DRAFT → LISTED → UNLISTED (SWAPPED OWNER_ACT
   Fetch one book (with media URLs + valuation if ready).  
   _Returns:_ full book detail object.
 
+- **GET** `/api/catalog/books/user/{userId}`  
+  Fetch list of books (with media URLs + valuation if ready) for that userId.  
+  _Returns:_ full list of book detail object.
 
 - **GET** `/api/catalog/books/recent?limit=20`  
   Most recent LISTED books for homepage feed.  
