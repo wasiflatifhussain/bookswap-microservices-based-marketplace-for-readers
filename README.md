@@ -22,8 +22,8 @@ Welcome to **BookSwap** – a smart trade marketplace for readers to swap novels
 - ✅ **Upload a book:** Add details (title, author, year, description, optional ISBN, notes).
 - ✅ **Upload photos:** Cover + condition photos (front, spine, pages).
 - ✅ **AI Valuation:**
-  - Condition detection (photos + metadata like “mint”, “signed”).
-  - Assigns BookCoins (band or exact value).
+    - Condition detection (photos + metadata like “mint”, “signed”).
+    - Assigns BookCoins (band or exact value).
 - ✅ **Add to catalog:** Once valued, the book is visible in the universal catalog.
 
 ### 4. Swap Requests
@@ -32,14 +32,15 @@ Welcome to **BookSwap** – a smart trade marketplace for readers to swap novels
 - ✅ **Notification:** Target user is notified (in-app + email).
 - ✅ **Accept/decline:** Target user can accept or reject.
 - ✅ **On accept:**
-  - Both users receive email with contact details.
-  - Both books are removed from the catalog.
-  - Any other pending swap requests involving those books are auto-deleted.
+    - Both users receive email with contact details.
+    - Both books are removed from the catalog.
+    - Any other pending swap requests involving those books are auto-deleted.
 
 ### 5. BookCoins System
 
 - ✅ **Wallet:** Each user has a BookCoin balance.
-- ✅ **Earn:** When you list/register a book → you receive BookCoins equal to valuation _(optional: only after a successful swap)_.
+- ✅ **Earn:** When you list/register a book → you receive BookCoins equal to valuation _(optional: only after a
+  successful swap)_.
 - ✅ **Spend:** When you swap → you pay with BookCoins.
 - ✅ **Auto-updates:** Accepting/declining swaps updates BookCoin balances.
 
@@ -163,7 +164,8 @@ _Manages: All swap actions for the users_
 
 ### **Valuation Service**
 
-_Maintain valuation and conversion rate for BookCoin to Book Price and so on; Keep this in Valuation Service as a versioned policy._
+_Maintain valuation and conversion rate for BookCoin to Book Price and so on; Keep this in Valuation Service as a
+versioned policy._
 
 - **POST** `/valuation/jobs`  
   Trigger (or retrigger) valuation for a book.  
@@ -187,7 +189,8 @@ _Maintain valuation and conversion rate for BookCoin to Book Price and so on; Ke
 
 ### **Wallet Service**
 
-_Maintain a wallet with user's BookCoin balance. When user adds a new book to his catalog, or swaps a book, the wallet valuation is adjusted._
+_Maintain a wallet with user's BookCoin balance. When user adds a new book to his catalog, or swaps a book, the wallet
+valuation is adjusted._
 
 - **GET** `/wallet/me`  
   Get my current BookCoin balance.  
@@ -258,11 +261,11 @@ _Owns: notifications (in-app only for MVP)_
 
 - **DB:** Postgres
 - **Stores:**
-  - books (title, author, year, desc, isbn, owner_id)
-  - state (`DRAFT` | `LISTED` | `UNLISTED`)
-  - valuation snapshot (valuation_coins, confidence, policy_ver, asof)
-  - media refs (media_ids/URLs)
-  - basic facets (genre, condition_band, language)
+    - books (title, author, year, desc, isbn, owner_id)
+    - state (`DRAFT` | `LISTED` | `UNLISTED`)
+    - valuation snapshot (valuation_coins, confidence, policy_ver, asof)
+    - media refs (media_ids/URLs)
+    - basic facets (genre, condition_band, language)
 - **Why SQL:** filtering, pagination, matching by valuation range
 
 ---
@@ -272,9 +275,9 @@ _Owns: notifications (in-app only for MVP)_
 - **Blob Store:** S3/MinIO bucket (actual images + thumbnails)
 - **DB:** Postgres (metadata)
 - **Stores:**
-  - media_id, book_id, owner_id
-  - kind (`COVER` | `COND`)
-  - url, thumb_url, checksums, created_at
+    - media_id, book_id, owner_id
+    - kind (`COVER` | `COND`)
+    - url, thumb_url, checksums, created_at
 
 ---
 
@@ -283,8 +286,8 @@ _Owns: notifications (in-app only for MVP)_
 - **DB:** None (MVP)
 - **Emits:** `valuation.ready` with `{ coins, confidence, policy_ver, asof }`
 - **Optional (later, Postgres):**
-  - valuation_audit (inputs, outputs, model/policy versions)
-  - valuation_policy (if you want versioned pricing rules)
+    - valuation_audit (inputs, outputs, model/policy versions)
+    - valuation_policy (if you want versioned pricing rules)
 
 ---
 
@@ -292,7 +295,8 @@ _Owns: notifications (in-app only for MVP)_
 
 - **DB:** Postgres
 - **Stores:**
-  - swaps (swap_id, buyer_id, seller_id, target_book_id, offer_coins, state `PENDING` | `ACCEPTED` | `DECLINED` | `CANCELLED` | `SETTLED`, timestamps, idempotency key)
+    - swaps (swap_id, buyer_id, seller_id, target_book_id, offer_coins, state `PENDING` | `ACCEPTED` | `DECLINED` |
+      `CANCELLED` | `SETTLED`, timestamps, idempotency key)
 - **Why SQL:** state machine integrity + history
 
 ---
@@ -301,8 +305,8 @@ _Owns: notifications (in-app only for MVP)_
 
 - **DB:** Postgres
 - **Stores:**
-  - wallet_balances (per user)
-  - wallet_ledger (immutable double-entry with delta_coins, balance_after, ref_type/ref_id, request_key)
+    - wallet_balances (per user)
+    - wallet_ledger (immutable double-entry with delta_coins, balance_after, ref_type/ref_id, request_key)
 - **Why SQL:** atomic debit/credit, strong consistency, auditability
 
 ---
@@ -312,7 +316,7 @@ _Owns: notifications (in-app only for MVP)_
 - **DB:** Redis (AOF enabled) for fast append/read of user notification lists  
   _(Option: Postgres if you want durable history from day one)_
 - **Stores:**
-  - `{ id, user_id, type, title, body, data, read, created_at }`
+    - `{ id, user_id, type, title, body, data, read, created_at }`
 
 ---
 
@@ -320,7 +324,8 @@ _Owns: notifications (in-app only for MVP)_
 
 - **Client ↔ Services:** REST (via API Gateway, OAuth2 PKCE/JWT)
 - **Service ↔ Service, write-path coupling:** Kafka events (choreography/sagas)
-- **Point lookups (reads):** REST (e.g., UI asks Catalog; services avoid synchronous cross-calls unless absolutely needed)
+- **Point lookups (reads):** REST (e.g., UI asks Catalog; services avoid synchronous cross-calls unless absolutely
+  needed)
 - **Real-time UI:** Notification service pushes over WebSocket
 
 ---
@@ -328,12 +333,12 @@ _Owns: notifications (in-app only for MVP)_
 ### 2) Kafka: Topics & Event Flow
 
 - Use domain topics with typed `type` fields, or one-per-domain:
-  - `catalog-events`
-  - `media-events`
-  - `valuation-events`
-  - `swap-events`
-  - `wallet-events`
-  - `notification-events` (optional audit)
+    - `catalog-events`
+    - `media-events`
+    - `valuation-events`
+    - `swap-events`
+    - `wallet-events`
+    - `notification-events` (optional audit)
 
 **All messages share an envelope (example):**
 
@@ -345,7 +350,12 @@ _Owns: notifications (in-app only for MVP)_
   "time": "2025-09-27T04:10:00Z",
   "subject": "swap_id",
   "trace_id": "correlation-uuid",
-  "data": { ... domain payload ... }
+  "data": {
+    ...
+    domain
+    payload
+    ...
+  }
 }
 ```
 
@@ -362,46 +372,46 @@ _Owns: notifications (in-app only for MVP)_
 **Catalog Service**
 
 - **Publishes:**
-  - `book.created`, `book.listed`, `book.unlisted` → `catalog-events`
+    - `book.created`, `book.listed`, `book.unlisted` → `catalog-events`
 - **Consumes:**
-  - `valuation.ready` (attach snapshot)
-  - `media.uploaded` (attach URLs)
+    - `valuation.ready` (attach snapshot)
+    - `media.uploaded` (attach URLs)
 
 **Media Service**
 
 - **Publishes:**
-  - `media.uploaded { book_id, urls[] }` → `media-events`
+    - `media.uploaded { book_id, urls[] }` → `media-events`
 - **Consumes:** none
 
 **Valuation Service**
 
 - **Publishes:**
-  - `valuation.ready { book_id, coins, confidence, policy_ver }` → `valuation-events`
+    - `valuation.ready { book_id, coins, confidence, policy_ver }` → `valuation-events`
 - **Consumes:**
-  - `book.created`, `media.uploaded` (to (re)compute)
+    - `book.created`, `media.uploaded` (to (re)compute)
 
 **Swap Service**
 
 - **Publishes:**
-  - `swap.created`, `swap.accepted`, `swap.declined`, `swap.cancelled` → `swap-events`
+    - `swap.created`, `swap.accepted`, `swap.declined`, `swap.cancelled` → `swap-events`
 - **Consumes:**
-  - (Option A) `wallet.settled` or observe `wallet.debited`/`credited` to mark SETTLED (your choice)
+    - (Option A) `wallet.settled` or observe `wallet.debited`/`credited` to mark SETTLED (your choice)
 
 **Wallet Service**
 
 - **Publishes:**
-  - `wallet.debited`, `wallet.credited` (and optionally `wallet.settled { swap_id }`) → `wallet-events`
+    - `wallet.debited`, `wallet.credited` (and optionally `wallet.settled { swap_id }`) → `wallet-events`
 - **Consumes:**
-  - `swap.accepted { swap_id, buyer_id, seller_id, coins }` → perform atomic DEBIT/CREDIT
+    - `swap.accepted { swap_id, buyer_id, seller_id, coins }` → perform atomic DEBIT/CREDIT
 
 **Notification Service (simple in-app)**
 
 - **Publishes:** (optional audit) `notification.sent`
 - **Consumes:**
-  - `swap.created` (notify owner)
-  - `swap.accepted` (notify both)
-  - `swap.declined`/`swap.cancelled` (notify requester)
-  - `book.unlisted` (optional)
+    - `swap.created` (notify owner)
+    - `swap.accepted` (notify both)
+    - `swap.declined`/`swap.cancelled` (notify requester)
+    - `book.unlisted` (optional)
 
 ---
 
@@ -428,7 +438,9 @@ _Owns: notifications (in-app only for MVP)_
 ### Event Reliability: Outbox Pattern
 
 **TL;DR:**  
-Whenever a request changes state in our DB and we need to publish an event (e.g., `book.created`), we first write the change and an event row into the same database transaction (the outbox table). A background relay reads the outbox and publishes to Kafka, marking rows as published.
+Whenever a request changes state in our DB and we need to publish an event (e.g., `book.created`), we first write the
+change and an event row into the same database transaction (the outbox table). A background relay reads the outbox and
+publishes to Kafka, marking rows as published.
 
 ---
 
@@ -444,7 +456,8 @@ Whenever a request changes state in our DB and we need to publish an event (e.g.
 #### **How It Works (Brief)**
 
 1. **In the service transaction:**  
-   Persist domain change **and** insert an outbox row (`event_id`, `aggregate_type`, `aggregate_id`, `type`, `payload`, `occurred_at`, `published_at` = NULL).
+   Persist domain change **and** insert an outbox row (`event_id`, `aggregate_type`, `aggregate_id`, `type`, `payload`,
+   `occurred_at`, `published_at` = NULL).
 2. **TX commits:**  
    Both records are durable.
 3. **Relay process:**  
@@ -515,7 +528,8 @@ Whenever a request changes state in our DB and we need to publish an event (e.g.
 
 **Swap Service — Layered (disciplined) + Outbox**
 
-- Impose the state machine in the service layer (Requested → Accepted → InTransit → Fulfilled/Cancelled) with guards (ownership, expiry).
+- Impose the state machine in the service layer (Requested → Accepted → InTransit → Fulfilled/Cancelled) with guards (
+  ownership, expiry).
 - Persist swaps; write Outbox events (swap.requested/accepted/fulfilled) in the same tx.
 - Add idempotency keys on risky mutations (accept/cancel).
 - Consider a small “policy” helper class to keep transition rules tidy.
@@ -534,3 +548,20 @@ Whenever a request changes state in our DB and we need to publish an event (e.g.
 - Ports: EmailSender, WsBroadcaster, TemplateRepository.
 - Infra adapters implement SMTP/SendGrid, WebSocket hub, template store.
 - Outbox usually not needed here (it’s a sink), but keep retries and dead-letter handling.
+
+Note:
+for keycloak, to login or register with postman,
+go to postman and bookswap/keycloak folder
+
+- we have a web-frontend keycloak client who handles login/register
+- go to auth and click get new token and use those params already there
+- pop-up will have both login and register features
+- in our system, each microservice will call keycloak introspect to verify
+- token; so we made an endpoint for it on postman
+- for it, we need under auth -> basic auth -> username=client-id, password=client secret
+- we made a client called bookswap-backend for this purpose
+- then for this request, under body, use formdata and token = user's jwt token
+- shud return 200 for success with user info
+- for logout, we made a temp logout endpoint on postman
+- it shud have no auth, and body shud have client_id=web-frontend
+- and shud be given refresh_token for that user (NOT token)

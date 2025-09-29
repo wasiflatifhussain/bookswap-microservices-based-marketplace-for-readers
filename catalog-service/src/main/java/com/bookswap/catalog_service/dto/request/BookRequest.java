@@ -36,7 +36,4 @@ public class BookRequest {
   private Float valuation;
 
   private List<String> mediaIds; // TODO: convert to actual media ids
-
-  @NotBlank(message = "Book ownerId is required")
-  private String ownerUserId; // NOTE: store Keycloak ID for users
 }

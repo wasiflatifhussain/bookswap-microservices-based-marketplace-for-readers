@@ -53,3 +53,13 @@ catalog-service/
 └── db/migration/
 └── V1__init.sql                # Flyway migration
 ```
+
+## Authentication
+
+All endpoints (except health/docs) require a valid access token.
+
+- Each request must have `Authorization: Bearer <token>`.
+- The token is introspected with Keycloak using the backend client.
+- Only active tokens are accepted; others get `401/403 Unauthorized`.
+
+See `security/KeycloakIntrospectionFilter.java` for details.
