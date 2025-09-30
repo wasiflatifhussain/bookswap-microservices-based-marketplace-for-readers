@@ -4,6 +4,7 @@ import com.bookswap.catalog_service.domain.book.Book;
 import com.bookswap.catalog_service.domain.book.BookStatus;
 import com.bookswap.catalog_service.domain.outbox.AggregateType;
 import com.bookswap.catalog_service.dto.event.BookCreatedEvent;
+import com.bookswap.catalog_service.dto.event.BookUnlistedEvent;
 import com.bookswap.catalog_service.dto.request.BookRequest;
 import com.bookswap.catalog_service.dto.response.BookDetailedResponse;
 import com.bookswap.catalog_service.dto.response.BookSimpleResponse;
@@ -97,7 +98,20 @@ public class BookService {
   public String deleteBookByBookId(String bookId) {
     log.info("Initiating deletion for book by bookId={}", bookId);
     try {
+      Optional<Book> bookOpt = bookRepository.findByBookId(bookId);
+      if (bookOpt.isEmpty()) {
+        return "ERROR: Book not found";
+      }
+      Book book = bookOpt.get();
       bookRepository.deleteByBookId(bookId);
+
+      BookUnlistedEvent unlistedEvent =
+          BookUnlistedEvent.builder()
+              .bookId(book.getBookId())
+              .ownerUserId(book.getOwnerUserId())
+              .build();
+
+      outboxService.enqueueEvent(AggregateType.BOOK, bookId, "BOOK_UNLISTED", unlistedEvent);
       return "SUCCESS";
     } catch (Exception e) {
       log.error("Error while deleting book with error=", e);

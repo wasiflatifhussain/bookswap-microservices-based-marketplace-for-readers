@@ -12,5 +12,4 @@ import lombok.NoArgsConstructor;
 public class BookUnlistedEvent {
   private String bookId;
   private String ownerUserId;
-  private String reason;
 }
