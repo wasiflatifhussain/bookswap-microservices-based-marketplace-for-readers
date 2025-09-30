@@ -64,49 +64,77 @@ All endpoints (except health/docs) require a valid access token.
 
 See `security/KeycloakIntrospectionFilter.java` for details.
 
-Flow with Outbox + Kafka
+## Book Creation & Outbox Event Flow
 
-Catalog (book created)
+When a user wants to save a new book, the following flow is executed:
 
-Save Book row with:
+### 1. User Submits Book Details
 
-valuation = null
+**Frontend:**  
+User sends a multipart POST request to store book details and images.
 
-mediaIds = []
+- **Endpoint:** `POST /api/catalog/books` (JSON metadata)
 
-status = DRAFT
+**Catalog Service:**
 
-In same DB TX, enqueue book.created into outbox.
+- **BEGIN TRANSACTION**
+    - `INSERT INTO books (bookId, status=DRAFT, valuation=NULL, mediaIds=[])`
+    - `INSERT INTO outbox_events (eventType=BOOK_CREATED, payload={book metadata})`
+- **COMMIT**
 
-Relay publishes to Kafka with the whole Book payload (or at least the fields Media/Valuation need).
+- **CatalogRelay (background):**
+    - Detects new outbox row
+    - Publishes to Kafka topic `book.created`
+    - Marks outbox row as SENT
 
-Media Service (consumer)
+---
 
-Subscribes to book.created.
+### 2. User Uploads Book Images
 
-Stores files to S3 / DB metadata.
+- **Endpoint:** `POST /api/media/books/{bookId}/images` (multipart photos)
 
-Emits media.uploaded { bookId, mediaIds[], urls[], thumbs[] }.
+**Media Service:**
 
-Valuation Service (consumer)
+- Stores files in S3/MinIO
+- Inserts media records in its DB
+- `INSERT INTO outbox_events (eventType=MEDIA_UPLOADED, payload={bookId, mediaIds, urls, thumbs})`
+- **MediaRelay:**
+    - Publishes Kafka `media.uploaded`
+    - Marks outbox row as SENT
 
-Subscribes to book.created.
+---
 
-Runs valuation job.
+### 3. Valuation Service Consumes Events
 
-Emits valuation.updated { bookId, valuation }.
+- **Consumes:** `book.created` and `media.uploaded` from Kafka
+- Once it has book metadata and at least one image URL:
+    - Runs valuation job
+    - `INSERT INTO outbox_events (eventType=VALUATION_UPDATED, payload={bookId, valuation})`
+- **ValuationRelay:**
+    - Publishes Kafka `valuation.updated`
+    - Marks outbox row as SENT
 
-Catalog (consumer)
+---
 
-Listens to media.uploaded: updates the mediaIds column for that book.
+### 4. Catalog Service Consumes Events
 
-Listens to valuation.updated: updates the valuation field.
+- **Consumes:**
+    - `media.uploaded` → `UPDATE books SET mediaIds = [...]`
+    - `valuation.updated` → `UPDATE books SET valuation = 12.5`
 
-Once both are filled, transitions status = LISTED.
+- When both `valuation != NULL` **and** `mediaIds` is not empty:
+    - `UPDATE books SET status = LISTED`
+    - *(Optional)* Enqueue outbox event `BOOK_LISTED`
+    - **Relay:** Publishes Kafka `book.listed`
 
-Notification/Search
+---
 
-Can also consume book.created or book.listed to notify users or index feeds.
+### 5. Other Consumers
+
+- **Notification/Search Services:**  
+  Can consume `book.created` or `book.listed` to notify users or index feeds.
+
+---
 
 ```
 When user wants to save new book, frontend does a multipart POST to store book details + images.
