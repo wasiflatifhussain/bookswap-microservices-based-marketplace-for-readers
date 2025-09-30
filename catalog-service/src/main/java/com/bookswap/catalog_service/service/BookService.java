@@ -1,7 +1,9 @@
 package com.bookswap.catalog_service.service;
 
-import com.bookswap.catalog_service.domain.Book;
-import com.bookswap.catalog_service.domain.BookStatus;
+import com.bookswap.catalog_service.domain.book.Book;
+import com.bookswap.catalog_service.domain.book.BookStatus;
+import com.bookswap.catalog_service.domain.outbox.AggregateType;
+import com.bookswap.catalog_service.dto.event.BookCreatedEvent;
 import com.bookswap.catalog_service.dto.request.BookRequest;
 import com.bookswap.catalog_service.dto.response.BookDetailedResponse;
 import com.bookswap.catalog_service.dto.response.BookSimpleResponse;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class BookService {
   private final BookRepository bookRepository;
+  private final OutboxService outboxService;
 
   public BookSimpleResponse addBook(BookRequest bookRequest) {
     log.info("Initiating adding book to for title={}", bookRequest.getTitle());
@@ -30,7 +33,22 @@ public class BookService {
       String keycloakId = (String) authentication.getPrincipal();
       Book book = mapRequestToBook(bookRequest, keycloakId);
       Book savedBook = bookRepository.save(book);
+
+      BookCreatedEvent bookCreatedEvent =
+          BookCreatedEvent.builder()
+              .bookId(savedBook.getBookId())
+              .title(savedBook.getTitle())
+              .description(savedBook.getDescription())
+              .author(savedBook.getAuthor())
+              .bookCondition(savedBook.getBookCondition())
+              .ownerUserId(savedBook.getOwnerUserId())
+              .build();
+
+      outboxService.enqueueEvent(
+          AggregateType.BOOK, savedBook.getBookId(), "BOOK_CREATED", bookCreatedEvent);
+
       return mapBookToSimplifiedBook(savedBook);
+
     } catch (Exception e) {
       log.error("Error while creating new book entry with e=", e);
       return BookSimpleResponse.builder()

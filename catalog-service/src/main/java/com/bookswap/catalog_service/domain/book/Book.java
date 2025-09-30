@@ -1,4 +1,4 @@
-package com.bookswap.catalog_service.domain;
+package com.bookswap.catalog_service.domain.book;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

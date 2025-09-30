@@ -1,9 +1,8 @@
 package com.bookswap.catalog_service.dto.response;
 
-import com.bookswap.catalog_service.domain.BookCondition;
-import com.bookswap.catalog_service.domain.BookGenre;
-import com.bookswap.catalog_service.domain.BookStatus;
-import jakarta.persistence.*;
+import com.bookswap.catalog_service.domain.book.BookCondition;
+import com.bookswap.catalog_service.domain.book.BookGenre;
+import com.bookswap.catalog_service.domain.book.BookStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
