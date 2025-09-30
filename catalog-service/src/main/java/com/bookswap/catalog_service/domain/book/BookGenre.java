@@ -1,4 +1,4 @@
-package com.bookswap.catalog_service.domain;
+package com.bookswap.catalog_service.domain.book;
 
 public enum BookGenre {
   FANTASY,

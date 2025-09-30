@@ -1,7 +1,7 @@
 package com.bookswap.catalog_service.repository;
 
-import com.bookswap.catalog_service.domain.Book;
-import com.bookswap.catalog_service.domain.BookStatus;
+import com.bookswap.catalog_service.domain.book.Book;
+import com.bookswap.catalog_service.domain.book.BookStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
