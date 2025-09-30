@@ -11,6 +11,8 @@ import java.util.Optional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +26,9 @@ public class BookService {
     log.info("Initiating adding book to for title={}", bookRequest.getTitle());
 
     try {
-      Book book = mapRequestToBook(bookRequest);
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      String keycloakId = (String) authentication.getPrincipal();
+      Book book = mapRequestToBook(bookRequest, keycloakId);
       Book savedBook = bookRepository.save(book);
       return mapBookToSimplifiedBook(savedBook);
     } catch (Exception e) {
@@ -134,7 +138,7 @@ public class BookService {
     }
   }
 
-  private Book mapRequestToBook(BookRequest bookRequest) {
+  private Book mapRequestToBook(BookRequest bookRequest, String keycloakId) {
     return Book.builder()
         .title(bookRequest.getTitle())
         .description(bookRequest.getDescription())
@@ -143,7 +147,7 @@ public class BookService {
         .bookCondition(bookRequest.getBookCondition())
         .valuation(bookRequest.getValuation())
         .bookStatus(BookStatus.AVAILABLE)
-        .ownerUserId(bookRequest.getOwnerUserId())
+        .ownerUserId(keycloakId)
         .mediaIds(bookRequest.getMediaIds())
         .build();
   }
