@@ -2,6 +2,7 @@ package com.bookswap.catalog_service.service;
 
 import com.bookswap.catalog_service.domain.outbox.OutboxEvent;
 import com.bookswap.catalog_service.domain.outbox.OutboxStatus;
+import com.bookswap.catalog_service.messaging.KafkaOutboxPublisher;
 import com.bookswap.catalog_service.repository.OutboxEventRepository;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class OutboxRelay {
   private final OutboxEventRepository outboxEventRepository;
+  private final KafkaOutboxPublisher kafkaOutboxPublisher;
   private static final int BATCH_SIZE = 50;
 
   @Scheduled(
@@ -31,13 +33,16 @@ public class OutboxRelay {
         outboxEventRepository.markAttempt(
             e.getOutboxEventId(), OutboxStatus.IN_PROGRESS, LocalDateTime.now());
 
-        // TODO: send to relevant Kafka topic based on aggregateType and eventType
-        // Temporary Simulation
-        log.info(
-            "OUTBOX PUBLISH catalog: eventType={} aggregateId={} payload={}",
-            e.getEventType(),
-            e.getAggregateId(),
-            e.getOutboxPayloadJson());
+        kafkaOutboxPublisher
+            .publish(
+                e.getAggregateType(),
+                e.getEventType(),
+                e.getAggregateId(),
+                e.getOutboxEventId(),
+                e.getOutboxPayloadJson())
+            .join();
+
+        log.info("Successfully published outbox event with id={}", e.getOutboxEventId());
 
         // NOTE: since we modify a managed JPA entity inside a @Transactional method,
         // changes will be auto-detected and persisted at transaction commit time.
