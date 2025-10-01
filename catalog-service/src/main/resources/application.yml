@@ -9,6 +9,16 @@ spring:
     hibernate:
       ddl-auto: update
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      enable-idempotence: true
+    catalog-service:
+      topic: catalog.events
+
   output:
     ansi:
       enabled: ALWAYS
@@ -21,3 +31,7 @@ keycloak:
   introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
   client-id: bookswap-backend
   client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
+
+outbox:
+  relay:
+    fixedDelayMs: 10000

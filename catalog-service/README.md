@@ -176,3 +176,25 @@ Catalog:
        → (optional) enqueue outbox event BOOK_LISTED
        → Relay publishes Kafka "book.listed"
 ```
+
+## Current Progress & TODOs
+
+### Catalog Service
+
+- Outbox pattern and event publishing to Kafka are implemented.
+- **Event listeners for valuation and media events are not yet implemented.**
+    - These will be added after the Valuation and Media services are developed.
+
+---
+
+### Planned Next Steps
+
+- [ ] Build Valuation and Media services.
+- [ ] Implement event listeners in Catalog Service:
+    - Listen to `valuation.events` (`BOOK_VALUATED`) → update `Book.valuation`
+    - Listen to `media.events` (`MEDIA_PROCESSED`) → update `Book.mediaId` / `thumbnailUrl`
+- [ ] Ensure idempotency using `outboxEventId` from incoming events.
+- [ ] Use `catalog-service` as the Kafka consumer group ID.
+- [ ] Test event-driven updates and document event payloads.
+
+---
