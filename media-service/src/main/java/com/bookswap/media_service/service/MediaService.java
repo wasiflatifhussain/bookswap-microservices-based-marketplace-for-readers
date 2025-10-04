@@ -24,8 +24,9 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 @Slf4j
 public class MediaService {
   private final MediaRepository mediaRepository;
-  private final PresignService presignService;
+  private final S3PresignService s3PresignService;
   private final OutboxService outboxService;
+  private final S3StorageService s3StorageService;
 
   @Value("${media.upload.ttl.minutes:10}")
   private int uploadTtlMinutes;
@@ -94,7 +95,7 @@ public class MediaService {
         mediaRepository.save(mediaRow);
 
         // Presign
-        URL url = presignService.presignPutUrl(objectKey, normalizedMime, ttl);
+        URL url = s3PresignService.presignPutUrl(objectKey, normalizedMime, ttl);
         UploadInitResponse.Item.Headers headers =
             new UploadInitResponse.Item.Headers(normalizedMime);
 
@@ -131,7 +132,7 @@ public class MediaService {
       }
 
       try {
-        HeadObjectResponse head = presignService.headObjectResponse(mediaFound.getObjectKey());
+        HeadObjectResponse head = s3StorageService.headObjectResponse(mediaFound.getObjectKey());
         if (head == null) {
           return makeCompleteResponse(
               mediaId, mediaFound.getBookId(), Status.FAILED, "Object not found.");
@@ -199,7 +200,7 @@ public class MediaService {
           .map(
               media -> {
                 try {
-                  URL presignedUrl = presignService.presignGetUrl(media.getObjectKey(), ttl);
+                  URL presignedUrl = s3PresignService.presignGetUrl(media.getObjectKey(), ttl);
 
                   return MediaViewResponse.builder()
                       .mediaId(media.getMediaId())
@@ -222,6 +223,57 @@ public class MediaService {
     } catch (Exception e) {
       log.error("Error fetching media for bookId={}:", bookId, e);
       return List.of();
+    }
+  }
+
+  public void deleteMediaByBookId(String bookId, String ownerUserId) {
+    log.info("Deleting all media for bookId={} ownerUserId={}", bookId, ownerUserId);
+
+    try {
+      List<Media> mediaList = mediaRepository.findByBookIdAndStatus(bookId, Status.STORED);
+
+      if (mediaList.isEmpty()) {
+        log.info("No stored media found for deletion for bookId={}", bookId);
+        return;
+      }
+
+      for (Media media : mediaList) {
+        try {
+          // Delete from S3
+          s3StorageService.deleteObject(media.getObjectKey());
+
+          // Delete from DB
+          mediaRepository.deleteById(media.getMediaId());
+
+          // NOTE: consider if this can be adjusted or removed as it causes problem
+          // to catalog service and it creates a circular dependency
+          // (catalog -> media -> catalog)
+
+          // Record in outbox (for auditing / synchronization)
+          outboxService.enqueueEvent(
+              AggregateType.MEDIA,
+              media.getMediaId(),
+              media.getBookId(),
+              "MEDIA_DELETED",
+              Map.of(
+                  "bookId", media.getBookId(),
+                  "ownerUserId", media.getOwnerUserId(),
+                  "mediaId", media.getMediaId()));
+
+          log.info("Deleted mediaId={} for bookId={}", media.getMediaId(), bookId);
+
+        } catch (Exception e) {
+          log.error(
+              "Failed to delete mediaId={} for bookId={}: {}",
+              media.getMediaId(),
+              bookId,
+              e.getMessage(),
+              e);
+        }
+      }
+
+    } catch (Exception e) {
+      log.error("Error deleting media for bookId={}:", bookId, e);
     }
   }
 

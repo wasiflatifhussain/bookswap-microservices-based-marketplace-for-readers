@@ -16,8 +16,15 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
       enable-idempotence: true
-    media-service:
-      topic: media.events
+      services:
+        media-service:
+          topic: media.events
+    consumer:
+      services:
+        catalog-service:
+          topic: catalog.events
+          group-id: media-catalog-consumers
+      auto-offset-reset: earliest
 
 
 cloud:

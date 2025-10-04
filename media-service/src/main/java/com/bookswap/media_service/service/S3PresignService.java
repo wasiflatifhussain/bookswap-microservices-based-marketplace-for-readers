@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
-import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -18,11 +16,10 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequ
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PresignService {
+public class S3PresignService {
   private final S3Client s3Client;
   private final S3Presigner s3Presigner;
 
-  // TODO: might require constructor based injection
   @Value("${aws.s3.bucket-name}")
   private String bucketName;
 
@@ -61,16 +58,6 @@ public class PresignService {
       log.error(
           "Failed to generate presigned GET URL for key {}: {}", objectKey, e.getMessage(), e);
       throw new RuntimeException("Failed to generate presigned GET URL", e);
-    }
-  }
-
-  public HeadObjectResponse headObjectResponse(String objectKey) {
-    try {
-      return s3Client.headObject(
-          HeadObjectRequest.builder().bucket(bucketName).key(objectKey).build());
-    } catch (Exception e) {
-      log.error("Failed to get head object for key {}: {}", objectKey, e.getMessage(), e);
-      throw new RuntimeException("Failed to get head object", e);
     }
   }
 }

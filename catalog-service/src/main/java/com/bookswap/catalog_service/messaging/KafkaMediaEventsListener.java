@@ -18,23 +18,40 @@ public class KafkaMediaEventsListener {
   private final BookService bookService;
 
   @KafkaListener(
-      topics = "${spring.kafka.consumer.media-service.topic}",
-      groupId = "${spring.kafka.consumer.media-service.group-id}")
-  public void handleMediaStoredEvent(ConsumerRecord<String, String> consumerRecord) {
-    try {
-      String value = consumerRecord.value();
-      MediaStoredEvent event =
-          objectMapper.readValue(
-              value,
-              MediaStoredEvent.class); // deserializes the JSON string into a MediaStoredEvent
-      log.info(
-          "Received MEDIA_STORED for bookId={} and mediaId={}",
-          event.getBookId(),
-          event.getMediaId());
+      topics = "${spring.kafka.consumer.services.media-service.topic}", // e.g. media.events
+      groupId = "${spring.kafka.consumer.services.media-service.group-id}")
+  public void onMediaEvent(ConsumerRecord<String, String> rec) {
+    final String eventType = header(rec, "eventType");
+    final String source = header(rec, "source"); // optional; see anti-loop note below
 
-      bookService.appendMediaToBook(event.getBookId(), event.getOwnerUserId(), event.getMediaId());
-    } catch (Exception e) {
-      log.error("Failed to process media event={} with e=", consumerRecord, e);
+    try {
+      if (eventType == null) {
+        log.warn(
+            "Skipping media event without eventType header: key={} value={}",
+            rec.key(),
+            rec.value());
+        return;
+      }
+
+      switch (eventType) {
+        case "MEDIA_STORED" -> {
+          MediaStoredEvent e = objectMapper.readValue(rec.value(), MediaStoredEvent.class);
+          log.info("MEDIA_STORED bookId={} mediaId={}", e.getBookId(), e.getMediaId());
+          // idempotent update (BookService should upsert only if missing)
+          bookService.appendMediaToBook(e.getBookId(), e.getOwnerUserId(), e.getMediaId());
+        }
+        default -> {
+          log.debug("Ignored media eventType={} key={}", eventType, rec.key());
+        }
+      }
+
+    } catch (Exception ex) {
+      log.error("Failed to process media event key={} value={}", rec.key(), rec.value(), ex);
     }
+  }
+
+  private static String header(ConsumerRecord<String, String> rec, String key) {
+    var h = rec.headers().lastHeader(key);
+    return (h == null) ? null : new String(h.value(), java.nio.charset.StandardCharsets.UTF_8);
   }
 }

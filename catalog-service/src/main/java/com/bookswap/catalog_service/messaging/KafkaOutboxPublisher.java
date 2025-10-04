@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class KafkaOutboxPublisher {
 
-  @Value("${spring.kafka.catalog-service.topic}")
+  @Value("${spring.kafka.producer.services.catalog-service.topic}")
   private String kafkaTopic;
 
   private final KafkaTemplate<String, String> kafkaTemplate;

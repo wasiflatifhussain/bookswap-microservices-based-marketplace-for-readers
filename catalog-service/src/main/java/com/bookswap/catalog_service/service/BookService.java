@@ -107,6 +107,8 @@ public class BookService {
               .ownerUserId(book.getOwnerUserId())
               .build();
 
+      // NOTE: This also puts an entry in Outbox table for audit - Outbox is an append-only log
+      // keeping both copies for record
       outboxService.enqueueEvent(AggregateType.BOOK, bookId, "BOOK_UNLISTED", unlistedEvent);
       return "SUCCESS";
     } catch (Exception e) {
