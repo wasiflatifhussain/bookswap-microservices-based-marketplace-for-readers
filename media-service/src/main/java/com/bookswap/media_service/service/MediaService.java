@@ -3,6 +3,7 @@ package com.bookswap.media_service.service;
 import com.bookswap.media_service.domain.media.Media;
 import com.bookswap.media_service.domain.media.Status;
 import com.bookswap.media_service.domain.outbox.AggregateType;
+import com.bookswap.media_service.dto.download.MediaViewResponse;
 import com.bookswap.media_service.dto.event.MediaStoredEvent;
 import com.bookswap.media_service.dto.upload.CompleteResponse;
 import com.bookswap.media_service.dto.upload.UploadInitRequest;
@@ -34,6 +35,9 @@ public class MediaService {
 
   @Value("${media.max.file.size.bytes:5242880}")
   private long maxFileSizeBytes;
+
+  @Value("${media.download.ttl.minutes:30}")
+  private int downloadTtlMinutes;
 
   public UploadInitResponse initUploads(
       String bookId, String ownerUserId, UploadInitRequest uploadInitRequest) {
@@ -174,6 +178,50 @@ public class MediaService {
       log.error("CompleteUpload failed for mediaId={} with error:", mediaId, e);
       return makeCompleteResponse(
           mediaId, null, Status.FAILED, "Unexpected error completing upload.");
+    }
+  }
+
+  public List<MediaViewResponse> getMediaByBookId(String bookId) {
+    log.info("Fetching media for bookId={}", bookId);
+
+    try {
+      List<Media> mediaList = mediaRepository.findByBookIdAndStatus(bookId, Status.STORED);
+
+      if (mediaList.isEmpty()) {
+        log.info("No stored media found for bookId={}", bookId);
+        return List.of();
+      }
+
+      Duration ttl = Duration.ofMinutes(downloadTtlMinutes);
+      OffsetDateTime expiresAt = OffsetDateTime.now().plus(ttl);
+
+      return mediaList.stream()
+          .map(
+              media -> {
+                try {
+                  URL presignedUrl = presignService.presignGetUrl(media.getObjectKey(), ttl);
+
+                  return MediaViewResponse.builder()
+                      .mediaId(media.getMediaId())
+                      .mimeType(media.getMimeType())
+                      .presignedUrl(presignedUrl.toString())
+                      .build();
+
+                } catch (Exception e) {
+                  log.warn(
+                      "Failed to presign URL for mediaId={} bookId={}",
+                      media.getMediaId(),
+                      bookId,
+                      e);
+                  return null;
+                }
+              })
+          .filter(Objects::nonNull)
+          .toList();
+
+    } catch (Exception e) {
+      log.error("Error fetching media for bookId={}:", bookId, e);
+      return List.of();
     }
   }
 

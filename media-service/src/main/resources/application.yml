@@ -37,6 +37,9 @@ media:
     ttl:
       minutes: 10
     mimes: image/jpeg,image/png
+  download:
+    ttl:
+      minutes: 30
   max:
     file:
       size:

@@ -1,9 +1,11 @@
 package com.bookswap.media_service.controller;
 
+import com.bookswap.media_service.dto.download.MediaViewResponse;
 import com.bookswap.media_service.dto.upload.CompleteResponse;
 import com.bookswap.media_service.dto.upload.UploadInitRequest;
 import com.bookswap.media_service.dto.upload.UploadInitResponse;
 import com.bookswap.media_service.service.MediaService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -29,5 +31,10 @@ public class MediaController {
       @PathVariable String mediaId, Authentication authentication) {
     String ownerUserId = authentication.getName();
     return ResponseEntity.ok(mediaService.completeUpload(mediaId, ownerUserId));
+  }
+
+  @GetMapping("/downloads/{bookId}/view")
+  public ResponseEntity<List<MediaViewResponse>> getMediaByBookId(@PathVariable String bookId) {
+    return ResponseEntity.ok(mediaService.getMediaByBookId(bookId));
   }
 }
