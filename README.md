@@ -146,86 +146,33 @@ _Manages: All swap actions for the users_
 
 ### **Media Service**
 
-#### POST `/api/media/books/{bookId}/uploads:init`
+#### Media Service Endpoints
 
-**Initialize an upload and get a presigned S3 URL.**
+- **POST /api/media/uploads/{bookId}/init**
+    - Initializes one or more media uploads for a book.
+    - Requires OAuth2 authentication.
+    - Request body: list of files with name, mimeType, and sizeBytes.
+    - Returns presigned S3 URLs and metadata for each file.
 
-**Request:**
+- **PUT presigned S3 URL**
+    - Upload the file directly to S3 using the provided presigned URL.
+    - Set the Content-Type header as specified in the response.
+    - Body is the binary image data.
 
-- **Headers:**
-    - `X-User-Id`: `<ownerUserId>`
-- **Body:**
-  ```json
-  {
-    "filename": "cover.jpg",
-    "kind": "cover" // or "condition"
-  }
-  ```
+- **POST /api/media/uploads/{mediaId}/complete**
+    - Confirms the upload for a specific media item.
+    - Requires OAuth2 authentication.
+    - Marks the media as STORED and publishes an event to Kafka for the Catalog service.
 
-**Response:**
+- **GET /api/media/downloads/{bookId}/view**
+    - Retrieves presigned S3 URLs for all images associated with a book.
+    - Requires OAuth2 authentication.
+    - Returns a list of short-lived URLs for viewing images.
 
-```json
-{
-  "requestId": "...",
-  "bookId": "...",
-  "results": [
-    {
-      "clientRef": "...",
-      "status": "READY",
-      "mediaId": "...",
-      "objectKey": "{bookId}/{mediaId}.jpg",
-      "presignedPutUrl": "...",
-      "requiredHeaders": {
-        "contentType": "image/jpeg"
-      },
-      "expiresAt": "...",
-      "errorCode": null,
-      "errorMessage": null
-    }
-  ]
-}
-```
-
-**Upload Step:**
-
-- Make a `PUT` request to `presignedPutUrl` with the file as the body.
-- Set header: `Content-Type: image/jpeg` (or as specified in `requiredHeaders`).
-
-**S3 Storage:**
-
-- Files are stored as:  
-  `{bookId}/{mediaId}.jpg`  
-  (No `books/` prefix, no mediaId folder.)
-
-#### GET `/api/media/{mediaId}`
-
-Fetch metadata for one uploaded image.
-
-**Response:**
-
-```json
-{
-  "media_id": "...",
-  "book_id": "...",
-  "owner_id": "...",
-  "kind": "...",
-  "url": "...",
-  "thumb_url": "...",
-  "created_at": "..."
-}
-```
-
-#### DELETE `/api/media/{mediaId}`
-
-Delete a media file (only by owner).
-
-**Response:**
-
-- `204 No Content`
-
-**Events:**
-
-- `media.uploaded { book_id, urls[], thumbs[] }`
+- **Media Deletion**
+    - Media is deleted automatically when a book is deleted in the Catalog service.
+    - The Catalog service emits an event to Kafka, which the Media service listens for to remove media from S3 and the
+      database.
 
 ---
 

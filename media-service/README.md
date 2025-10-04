@@ -284,3 +284,102 @@ src/
 - FE can create book → upload via pre-signed PUT → complete → see the cover/image via Catalog response without extra
   FE→Media calls.
 - Expired URL refresh path tested (re-request from Catalog triggers fresh sign under the hood).
+
+# Media Service API Workflow
+
+This service manages book media uploads, storage, and retrieval using S3 presigned URLs, OAuth2 authentication, and
+Kafka for event-driven updates to the Catalog service.
+
+## Overview of the Media Upload and Retrieval Process
+
+The Media Service enables users to upload images (such as book covers or condition photos) for books in a secure,
+scalable, and efficient way. The process is designed to:
+
+- Allow direct uploads from the client to S3 using presigned URLs (minimizing backend load and latency)
+- Ensure only authenticated users can upload or view media
+- Maintain a reliable record of all media in a database
+- Notify the Catalog service of new media via Kafka events, so book listings can be updated with images
+- Support secure, time-limited access to images for viewing
+- Handle deletions in a coordinated, event-driven manner
+
+### Step-by-Step Workflow
+
+#### 1. Initialize Upload
+
+The client (frontend or another service) initiates an upload for one or more images for a specific book. This is done by
+calling:
+
+- **Endpoint:** `POST /api/media/uploads/{bookId}/init`
+- **Auth:** OAuth2.0 Bearer Token (required)
+- **Body:**
+  ```json
+  {
+    "files": [
+      {
+        "clientRef": "ref1",
+        "name": "1.png",
+        "mimeType": "image/png",
+        "sizeBytes": 123456
+      }
+      // ... more files
+    ]
+  }
+  ```
+- **What happens:**
+    - The service validates the file types and sizes.
+    - For each file, it creates a new media record in the database with status `PENDING`.
+    - It generates a presigned S3 URL for each file, allowing the client to upload directly to S3.
+    - The response includes a list of presigned URLs and metadata (including a `mediaId` for each file).
+
+#### 2. Upload File to S3
+
+The client uploads each image directly to S3 using the provided presigned URL:
+
+- **Method:** `PUT`
+- **URL:** Use the `presignedPutUrl` from the previous step.
+- **Headers:**
+    - `Content-Type: image/png` (or `image/jpeg` as appropriate)
+- **Body:** Binary image data.
+- **What happens:**
+    - The file is stored in S3 under a folder named after the `bookId`, with the filename as the `mediaId` and the
+      correct extension.
+    - The backend is not involved in the file transfer, improving scalability and performance.
+
+#### 3. Complete Upload
+
+After uploading, the client must confirm the upload:
+
+- **Endpoint:** `POST /api/media/uploads/{mediaId}/complete`
+- **Auth:** OAuth2.0 Bearer Token (required)
+- **Body:** _None_
+- **What happens:**
+    - The service verifies the file exists in S3 and updates the media record status to `STORED`.
+    - It publishes a Kafka event so the Catalog service can update its book record with the new media ID.
+    - This ensures the Catalog always has an up-to-date list of images for each book.
+
+#### 4. Viewing Images
+
+To view images for a book:
+
+- **Endpoint:** `GET /api/media/downloads/{bookId}/view`
+- **Auth:** OAuth2.0 Bearer Token (required)
+- **What happens:**
+    - The service finds all `STORED` media for the book.
+    - It generates presigned S3 GET URLs for each image, valid for a short time.
+    - The client can use these URLs to view images directly from S3.
+
+#### 5. Deleting Media
+
+- Media cannot be deleted directly via API.
+- When a book is deleted in the Catalog service, it publishes an event to Kafka.
+- The Media service listens for this event and deletes the corresponding media from S3 and the media database.
+- This ensures data consistency and prevents orphaned images.
+
+## Notes
+
+- All endpoints require OAuth2 authentication.
+- Only `image/png` and `image/jpeg` are supported for uploads.
+- Presigned URLs are short-lived (5–10 minutes for upload, configurable for download).
+- Media is always stored in S3 under a folder named after the `bookId`, with each image as a separate object.
+- The Catalog service updates its book records with media IDs based on Kafka events from the Media service.
+- This architecture ensures scalability, security, and consistency across services.
