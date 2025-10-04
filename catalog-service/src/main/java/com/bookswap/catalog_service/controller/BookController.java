@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,8 +19,10 @@ public class BookController {
   private final BookService bookService;
 
   @PostMapping("/books")
-  public ResponseEntity<BookSimpleResponse> addBook(@Valid @RequestBody BookRequest bookRequest) {
-    return ResponseEntity.ok(bookService.addBook(bookRequest));
+  public ResponseEntity<BookSimpleResponse> addBook(
+      @Valid @RequestBody BookRequest bookRequest, Authentication authentication) {
+    String keyCloakId = authentication.getName(); // Remove tight-coupling of service with Keycloak
+    return ResponseEntity.ok(bookService.addBook(bookRequest, keyCloakId));
   }
 
   @GetMapping("/books/{bookId}")

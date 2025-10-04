@@ -26,4 +26,6 @@ public interface BookRepository extends JpaRepository<Book, String> {
       @Param("minVal") Double minVal,
       @Param("maxVal") Double maxVal,
       Pageable pageable);
+
+  Optional<Book> findByBookIdAndOwnerUserId(String bookId, String ownerUserId);
 }

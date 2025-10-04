@@ -146,19 +146,86 @@ _Manages: All swap actions for the users_
 
 ### **Media Service**
 
-- **POST** `/media/books/{bookId}/images`  
-  Upload cover/condition photos for a book (multipart form).  
-  Stores files in S3/MinIO, saves metadata.  
-  _Returns:_ `{ media_ids: [...], urls: [...], thumbnails: [...] }`  
-  _Emits:_ `media.uploaded { book_id, urls[], thumbs[] }`
+#### POST `/api/media/books/{bookId}/uploads:init`
 
-- **GET** `/media/{mediaId}`  
-  Fetch metadata for one uploaded image.  
-  _Returns:_ `{ media_id, book_id, owner_id, kind, url, thumb_url, created_at }`
+**Initialize an upload and get a presigned S3 URL.**
 
-- **DELETE** `/media/{mediaId}`  
-  Delete a media file (only by owner).  
-  _Returns:_ `204 No Content`
+**Request:**
+
+- **Headers:**
+    - `X-User-Id`: `<ownerUserId>`
+- **Body:**
+  ```json
+  {
+    "filename": "cover.jpg",
+    "kind": "cover" // or "condition"
+  }
+  ```
+
+**Response:**
+
+```json
+{
+  "requestId": "...",
+  "bookId": "...",
+  "results": [
+    {
+      "clientRef": "...",
+      "status": "READY",
+      "mediaId": "...",
+      "objectKey": "{bookId}/{mediaId}.jpg",
+      "presignedPutUrl": "...",
+      "requiredHeaders": {
+        "contentType": "image/jpeg"
+      },
+      "expiresAt": "...",
+      "errorCode": null,
+      "errorMessage": null
+    }
+  ]
+}
+```
+
+**Upload Step:**
+
+- Make a `PUT` request to `presignedPutUrl` with the file as the body.
+- Set header: `Content-Type: image/jpeg` (or as specified in `requiredHeaders`).
+
+**S3 Storage:**
+
+- Files are stored as:  
+  `{bookId}/{mediaId}.jpg`  
+  (No `books/` prefix, no mediaId folder.)
+
+#### GET `/api/media/{mediaId}`
+
+Fetch metadata for one uploaded image.
+
+**Response:**
+
+```json
+{
+  "media_id": "...",
+  "book_id": "...",
+  "owner_id": "...",
+  "kind": "...",
+  "url": "...",
+  "thumb_url": "...",
+  "created_at": "..."
+}
+```
+
+#### DELETE `/api/media/{mediaId}`
+
+Delete a media file (only by owner).
+
+**Response:**
+
+- `204 No Content`
+
+**Events:**
+
+- `media.uploaded { book_id, urls[], thumbs[] }`
 
 ---
 

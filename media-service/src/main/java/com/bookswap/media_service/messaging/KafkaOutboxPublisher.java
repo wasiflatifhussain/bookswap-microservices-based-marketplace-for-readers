@@ -1,6 +1,6 @@
-package com.bookswap.catalog_service.messaging;
+package com.bookswap.media_service.messaging;
 
-import com.bookswap.catalog_service.domain.outbox.AggregateType;
+import com.bookswap.media_service.domain.outbox.AggregateType;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -17,13 +17,24 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class KafkaOutboxPublisher {
 
-  @Value("${spring.kafka.producer.services.catalog-service.topic}")
+  @Value("${spring.kafka.producer.services.media-service.topic}")
   private String kafkaTopic;
 
   private final KafkaTemplate<String, String> kafkaTemplate;
 
-  // error handling and retries required
+  /**
+   * Publish an outbox event to Kafka.
+   *
+   * @param bookId the Kafka partition key (use bookId to keep all media for book on same partition)
+   * @param aggregateType e.g. MEDIA
+   * @param eventType e.g. MEDIA_STORED
+   * @param aggregateId the aggregate id the event is about (mediaId)
+   * @param outboxEventId db id for the outbox row (for tracing/idempotency)
+   * @param jsonPayload serialized JSON payload
+   * @return future that completes with the send result (or exceptionally on failure)
+   */
   public CompletableFuture<Void> publish(
+      String bookId,
       AggregateType aggregateType,
       String eventType,
       String aggregateId,
@@ -31,15 +42,13 @@ public class KafkaOutboxPublisher {
       String jsonPayload) {
 
     try {
-      ProducerRecord<String, String> record =
-          new ProducerRecord<>(kafkaTopic, aggregateId, jsonPayload);
+      ProducerRecord<String, String> record = new ProducerRecord<>(kafkaTopic, bookId, jsonPayload);
       record
           .headers()
-          .add(new RecordHeader("eventType", eventType.getBytes(StandardCharsets.UTF_8)))
-          .add(
-              new RecordHeader(
-                  "aggregateType", aggregateType.name().getBytes(StandardCharsets.UTF_8)))
-          .add(new RecordHeader("outboxEventId", outboxEventId.getBytes(StandardCharsets.UTF_8)));
+          .add(new RecordHeader("eventType", bytes(eventType)))
+          .add(new RecordHeader("aggregateType", bytes(aggregateType.name())))
+          .add(new RecordHeader("aggregateId", bytes(aggregateId)))
+          .add(new RecordHeader("outboxEventId", bytes(outboxEventId)));
 
       CompletableFuture<SendResult<String, String>> completableFuture = kafkaTemplate.send(record);
 
@@ -51,7 +60,7 @@ public class KafkaOutboxPublisher {
                 metadata.topic(),
                 metadata.partition(),
                 metadata.offset(),
-                aggregateId);
+                bookId);
           });
     } catch (Exception ex) {
       log.error("Error while publishing to Kafka for outboxEventId={}", outboxEventId, ex);
@@ -59,5 +68,9 @@ public class KafkaOutboxPublisher {
       failedFuture.completeExceptionally(ex);
       return failedFuture;
     }
+  }
+
+  private static byte[] bytes(String s) {
+    return s == null ? new byte[0] : s.getBytes(StandardCharsets.UTF_8);
   }
 }
