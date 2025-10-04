@@ -18,7 +18,13 @@ spring:
       enable-idempotence: true
     catalog-service:
       topic: catalog.events
+    consumer:
+      media-service:
+        topic: media.events
+        group-id: catalog-media-consumers
+      auto-offset-reset: earliest
 
+  
   output:
     ansi:
       enabled: ALWAYS

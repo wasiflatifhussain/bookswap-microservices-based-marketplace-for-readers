@@ -166,6 +166,33 @@ public class BookService {
     }
   }
 
+  @Transactional
+  public void appendMediaToBook(String bookId, String ownerUserId, String mediaId) {
+    Optional<Book> bookOpt = bookRepository.findByBookIdAndOwnerUserId(bookId, ownerUserId);
+
+    if (bookOpt.isEmpty()) {
+      log.warn(
+          "Book not found or owner mismatch when appending media: bookId={}, ownerUserId={}",
+          bookId,
+          ownerUserId);
+      return;
+    }
+
+    Book book = bookOpt.get();
+    List<String> mediaIds = book.getMediaIds();
+
+    if (mediaIds.contains(mediaId)) {
+      log.info("MediaId={} already exists in bookId={}, skipping append", mediaId, bookId);
+      return;
+    }
+
+    mediaIds.add(mediaId);
+    book.setMediaIds(mediaIds);
+    bookRepository.save(book);
+
+    log.info("Appended mediaId={} to bookId={} for ownerUserId={}", mediaId, bookId, ownerUserId);
+  }
+
   private Book mapRequestToBook(BookRequest bookRequest, String keycloakId) {
     return Book.builder()
         .title(bookRequest.getTitle())
