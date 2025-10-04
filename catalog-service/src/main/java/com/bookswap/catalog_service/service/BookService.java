@@ -14,8 +14,6 @@ import java.util.Optional;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,12 +24,10 @@ public class BookService {
   private final BookRepository bookRepository;
   private final OutboxService outboxService;
 
-  public BookSimpleResponse addBook(BookRequest bookRequest) {
+  public BookSimpleResponse addBook(BookRequest bookRequest, String keycloakId) {
     log.info("Initiating adding book to for title={}", bookRequest.getTitle());
 
     try {
-      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-      String keycloakId = (String) authentication.getPrincipal();
       Book book = mapRequestToBook(bookRequest, keycloakId);
       Book savedBook = bookRepository.save(book);
 

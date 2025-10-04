@@ -1,4 +1,4 @@
-package com.bookswap.catalog_service.security;
+package com.bookswap.media_service.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;

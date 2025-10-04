@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: media-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookswap_media_db
+    username: wasiflatifhussain
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      enable-idempotence: true
+    media-service:
+      topic: media.events
+
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region:
+      static: ap-southeast-1
+
+aws:
+  s3:
+    bucket-name: ${S3_BUCKET_NAME}
+
+media:
+  upload:
+    ttl:
+      minutes: 10
+    mimes: image/jpeg,image/png
+  max:
+    file:
+      size:
+        bytes: 5242880  # 5 MB
+
+keycloak:
+  introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
+  client-id: bookswap-backend
+  client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
+
+server:
+  port: 8082
