@@ -156,35 +156,45 @@ src/
 
 **Complete Upload**
 
-- POST /media/uploads/{mediaId}/complete
+- POST /media/uploads/{bookId}/complete
+- Body: List<String> mediaIds
 - Behavior:
     - HEAD object by objectKey
     - If present: update status=STORED, set mime_type, size_bytes
     - Emit MEDIA_STORED
-- Response: { mediaId, bookId, status: "STORED" }
+- Response:
+
+```json
+{
+  "bookId": "...",
+  "totalCount": 4,
+  "successCount": 4,
+  "items": [
+    {
+      "mediaId": "...",
+      "bookId": "...",
+      "status": "STORED",
+      "message": "Stored successfully."
+    }
+  ]
+}
+```
+
 - Errors:
     - 404 if mediaId unknown
     - 409/422 if object not found (i.e., PUT didn’t happen)
 
-**Get View URL (single)**
+**GET /api/media/downloads/{bookId}/view**
 
-- GET /media/{mediaId}/view-url
-- Looks up objectKey, returns short-lived pre-signed GET URL
-- Response: { mediaId, url, expiresAt }
-- 404 if not STORED (or you allow for PENDING → 409)
+- Retrieves presigned S3 URLs for all images associated with a book.
+- Requires OAuth2 authentication.
+- Returns a list of short-lived URLs for viewing images.
 
-**Get View URLs (batch)**
+**Media Deletion**
 
-- POST /media/view-urls:batch
-- Body: { mediaIds: ["..."] }
-- Response: { items: [{ mediaId, url, expiresAt }] }
-- Optimizes N calls on list/detail pages.
-
-**List by Book (no URLs)**
-
-- GET /media/by-book/{bookId}
-- Response: { items: [{ mediaId, mimeType, sizeBytes, status }] }
-- Frontend (or Catalog) calls view-url endpoints for actual renders.
+- Media is deleted automatically when a book is deleted in the Catalog service.
+- The Catalog service emits an event to Kafka, which the Media service listens for to remove media from S3 and the
+  database.
 
 #### Catalog Service
 

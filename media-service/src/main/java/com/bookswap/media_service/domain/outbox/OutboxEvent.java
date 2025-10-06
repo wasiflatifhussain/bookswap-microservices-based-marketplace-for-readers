@@ -25,11 +25,7 @@ public class OutboxEvent {
   private AggregateType aggregateType;
 
   @Column(nullable = false)
-  private String aggregateId;
-
-  @Column(nullable = false)
-  private String
-      bookId; // use as partitionKey on Kafka to keep all media for a book on same partition
+  private String aggregateId; // NOTE: here this is bookId
 
   @Column(nullable = false)
   private String eventType;

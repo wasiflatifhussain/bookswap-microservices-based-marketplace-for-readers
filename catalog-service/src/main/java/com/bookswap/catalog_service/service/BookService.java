@@ -9,6 +9,8 @@ import com.bookswap.catalog_service.dto.request.BookRequest;
 import com.bookswap.catalog_service.dto.response.BookDetailedResponse;
 import com.bookswap.catalog_service.dto.response.BookSimpleResponse;
 import com.bookswap.catalog_service.repository.BookRepository;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
@@ -169,9 +171,13 @@ public class BookService {
   }
 
   @Transactional
-  public void appendMediaToBook(String bookId, String ownerUserId, String mediaId) {
-    Optional<Book> bookOpt = bookRepository.findByBookIdAndOwnerUserId(bookId, ownerUserId);
+  public void appendMediaToBook(String bookId, String ownerUserId, List<String> mediaIds) {
+    if (mediaIds == null || mediaIds.isEmpty()) {
+      log.info("No mediaIds to append for bookId={} ownerUserId={}", bookId, ownerUserId);
+      return;
+    }
 
+    Optional<Book> bookOpt = bookRepository.findByBookIdAndOwnerUserId(bookId, ownerUserId);
     if (bookOpt.isEmpty()) {
       log.warn(
           "Book not found or owner mismatch when appending media: bookId={}, ownerUserId={}",
@@ -181,18 +187,21 @@ public class BookService {
     }
 
     Book book = bookOpt.get();
-    List<String> mediaIds = book.getMediaIds();
+    List<String> current = book.getMediaIds();
+    if (current == null) current = new java.util.ArrayList<>();
 
-    if (mediaIds.contains(mediaId)) {
-      log.info("MediaId={} already exists in bookId={}, skipping append", mediaId, bookId);
+    LinkedHashSet<String> mergedMediaIds = new LinkedHashSet<>(current);
+    mergedMediaIds.addAll(mediaIds);
+
+    if (mergedMediaIds.size() == current.size()) {
+      log.info("No new mediaIds to append for bookId={} ownerUserId={}", bookId, ownerUserId);
       return;
     }
 
-    mediaIds.add(mediaId);
-    book.setMediaIds(mediaIds);
+    book.setMediaIds(new ArrayList<>(mergedMediaIds));
     bookRepository.save(book);
 
-    log.info("Appended mediaId={} to bookId={} for ownerUserId={}", mediaId, bookId, ownerUserId);
+    log.info("Appended mediaIds={} to bookId={} for ownerUserId={}", mediaIds, bookId, ownerUserId);
   }
 
   private Book mapRequestToBook(BookRequest bookRequest, String keycloakId) {

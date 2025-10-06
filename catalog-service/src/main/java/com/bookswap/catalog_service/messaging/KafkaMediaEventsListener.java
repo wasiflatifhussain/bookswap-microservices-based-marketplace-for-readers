@@ -36,9 +36,9 @@ public class KafkaMediaEventsListener {
       switch (eventType) {
         case "MEDIA_STORED" -> {
           MediaStoredEvent e = objectMapper.readValue(rec.value(), MediaStoredEvent.class);
-          log.info("MEDIA_STORED bookId={} mediaId={}", e.getBookId(), e.getMediaId());
+          log.info("MEDIA_STORED bookId={} mediaId={}", e.getBookId(), e.getMediaIds());
           // idempotent update (BookService should upsert only if missing)
-          bookService.appendMediaToBook(e.getBookId(), e.getOwnerUserId(), e.getMediaId());
+          bookService.appendMediaToBook(e.getBookId(), e.getOwnerUserId(), e.getMediaIds());
         }
         default -> {
           log.debug("Ignored media eventType={} key={}", eventType, rec.key());

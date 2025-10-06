@@ -159,10 +159,10 @@ _Manages: All swap actions for the users_
     - Set the Content-Type header as specified in the response.
     - Body is the binary image data.
 
-- **POST /api/media/uploads/{mediaId}/complete**
-    - Confirms the upload for a specific media item.
+- **POST /api/media/uploads/{bookId}/complete**
+    - Confirms the media upload for a specific book.
     - Requires OAuth2 authentication.
-    - Marks the media as STORED and publishes an event to Kafka for the Catalog service.
+    - Marks the medias as STORED and publishes an event to Kafka for the Catalog service.
 
 - **GET /api/media/downloads/{bookId}/view**
     - Retrieves presigned S3 URLs for all images associated with a book.

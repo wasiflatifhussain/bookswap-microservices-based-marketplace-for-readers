@@ -25,7 +25,6 @@ public class KafkaOutboxPublisher {
   /**
    * Publish an outbox event to Kafka.
    *
-   * @param bookId the Kafka partition key (use bookId to keep all media for book on same partition)
    * @param aggregateType e.g. MEDIA
    * @param eventType e.g. MEDIA_STORED
    * @param aggregateId the aggregate id the event is about (mediaId)
@@ -34,7 +33,6 @@ public class KafkaOutboxPublisher {
    * @return future that completes with the send result (or exceptionally on failure)
    */
   public CompletableFuture<Void> publish(
-      String bookId,
       AggregateType aggregateType,
       String eventType,
       String aggregateId,
@@ -42,7 +40,8 @@ public class KafkaOutboxPublisher {
       String jsonPayload) {
 
     try {
-      ProducerRecord<String, String> record = new ProducerRecord<>(kafkaTopic, bookId, jsonPayload);
+      ProducerRecord<String, String> record =
+          new ProducerRecord<>(kafkaTopic, aggregateId, jsonPayload);
       record
           .headers()
           .add(new RecordHeader("eventType", bytes(eventType)))
@@ -60,7 +59,7 @@ public class KafkaOutboxPublisher {
                 metadata.topic(),
                 metadata.partition(),
                 metadata.offset(),
-                bookId);
+                aggregateId);
           });
     } catch (Exception ex) {
       log.error("Error while publishing to Kafka for outboxEventId={}", outboxEventId, ex);
