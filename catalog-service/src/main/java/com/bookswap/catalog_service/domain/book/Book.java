@@ -37,8 +37,8 @@ public class Book {
   @Enumerated(EnumType.STRING)
   private BookStatus bookStatus;
 
-  private List<String> mediaIds; // TODO: convert to actual media ids
-  private String ownerUserId; // NOTE: store Keycloak ID for users
+  private List<String> mediaIds;
+  private String ownerUserId;
 
   @CreationTimestamp private LocalDateTime createdAt;
   @UpdateTimestamp private LocalDateTime updatedAt;

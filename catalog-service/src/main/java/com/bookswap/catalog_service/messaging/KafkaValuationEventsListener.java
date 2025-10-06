@@ -1,6 +1,6 @@
 package com.bookswap.catalog_service.messaging;
 
-import com.bookswap.catalog_service.dto.event.MediaStoredEvent;
+import com.bookswap.catalog_service.dto.event.ValuationComputedEvent;
 import com.bookswap.catalog_service.service.BookService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -12,33 +12,38 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KafkaMediaEventsListener {
-
+public class KafkaValuationEventsListener {
   private final ObjectMapper objectMapper;
   private final BookService bookService;
 
   @KafkaListener(
-      topics = "${spring.kafka.consumer.services.media-service.topic}",
-      groupId = "${spring.kafka.consumer.services.media-service.group-id}")
-  public void onMediaEvent(ConsumerRecord<String, String> rec) {
+      topics = "${spring.kafka.consumer.services.valuation-service.topic}", // e.g. media.events
+      groupId = "${spring.kafka.consumer.services.valuation-service.group-id}")
+  public void onValuationEvent(ConsumerRecord<String, String> rec) {
     final String eventType = header(rec, "eventType");
     final String source = header(rec, "source"); // optional; see anti-loop note below
 
     try {
       if (eventType == null) {
         log.warn(
-            "Skipping media event without eventType header: key={} value={}",
+            "Skipping valuation event without eventType header: key={} value={}",
             rec.key(),
             rec.value());
         return;
       }
 
       switch (eventType) {
-        case "MEDIA_STORED" -> {
-          MediaStoredEvent e = objectMapper.readValue(rec.value(), MediaStoredEvent.class);
-          log.info("MEDIA_STORED bookId={} mediaIds={}", e.getBookId(), e.getMediaIds());
+        case "VALUATION_COMPUTED" -> {
+          ValuationComputedEvent e =
+              objectMapper.readValue(rec.value(), ValuationComputedEvent.class);
+          log.info(
+              "VALUATION_COMPUTED bookId={} for ownerId={} with bookCoinValue=",
+              e.getBookId(),
+              e.getOwnerUserId(),
+              e.getBookCoinValue());
           // idempotent update (BookService should upsert only if missing)
-          bookService.appendMediaToBook(e.getBookId(), e.getOwnerUserId(), e.getMediaIds());
+          bookService.appendValuationToBook(
+              e.getBookId(), e.getOwnerUserId(), e.getBookCoinValue());
         }
         default -> {
           log.debug("Ignored media eventType={} key={}", eventType, rec.key());

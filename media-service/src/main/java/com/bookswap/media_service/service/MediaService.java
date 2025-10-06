@@ -251,7 +251,7 @@ public class MediaService {
   }
 
   public void deleteMediaByBookId(String bookId, String ownerUserId) {
-    log.info("Deleting all media for bookId={} ownerUserId={}", bookId, ownerUserId);
+    log.info("Deleting all media for bookId={} for ownerUserId={}", bookId, ownerUserId);
 
     try {
       List<Media> mediaList = mediaRepository.findByBookIdAndStatus(bookId, Status.STORED);

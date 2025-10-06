@@ -1,4 +1,4 @@
-package com.bookswap.media_service.domain.outbox;
+package com.bookswap.valuation_service.domain.outbox;
 
 public enum AggregateType {
   BOOK,

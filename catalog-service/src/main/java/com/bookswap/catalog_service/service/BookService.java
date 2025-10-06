@@ -26,6 +26,7 @@ public class BookService {
   private final BookRepository bookRepository;
   private final OutboxService outboxService;
 
+  @Transactional
   public BookSimpleResponse addBook(BookRequest bookRequest, String keycloakId) {
     log.info("Initiating adding book to for title={}", bookRequest.getTitle());
 
@@ -172,41 +173,82 @@ public class BookService {
 
   @Transactional
   public void appendMediaToBook(String bookId, String ownerUserId, List<String> mediaIds) {
-    if (mediaIds == null || mediaIds.isEmpty()) {
-      log.info("No mediaIds to append for bookId={} ownerUserId={}", bookId, ownerUserId);
-      return;
-    }
+    try {
+      if (mediaIds == null || mediaIds.isEmpty()) {
+        log.info("No mediaIds to append for bookId={} ownerUserId={}", bookId, ownerUserId);
+        return;
+      }
 
-    Optional<Book> bookOpt = bookRepository.findByBookIdAndOwnerUserId(bookId, ownerUserId);
-    if (bookOpt.isEmpty()) {
-      log.warn(
-          "Book not found or owner mismatch when appending media: bookId={}, ownerUserId={}",
+      Optional<Book> bookOpt = bookRepository.findByBookIdAndOwnerUserId(bookId, ownerUserId);
+      if (bookOpt.isEmpty()) {
+        log.warn(
+            "Book not found or owner mismatch when appending media: bookId={}, ownerUserId={}",
+            bookId,
+            ownerUserId);
+        return;
+      }
+
+      Book book = bookOpt.get();
+      List<String> current = book.getMediaIds();
+      if (current == null) current = new java.util.ArrayList<>();
+
+      LinkedHashSet<String> mergedMediaIds = new LinkedHashSet<>(current);
+      mergedMediaIds.addAll(mediaIds);
+
+      if (mergedMediaIds.size() == current.size()) {
+        log.info("No new mediaIds to append for bookId={} ownerUserId={}", bookId, ownerUserId);
+        return;
+      }
+
+      book.setMediaIds(new ArrayList<>(mergedMediaIds));
+      bookRepository.save(book);
+
+      // Enqueue BOOK_MEDIA_FINALIZED event
+      // Payload is the full Book object with updated mediaIds
+      // Gets picked up by OutboxRelay to be sent to Kafka for ValuationService to process
+      outboxService.enqueueEvent(
+          AggregateType.BOOK, book.getBookId(), "BOOK_MEDIA_FINALIZED", book);
+
+      log.info(
+          "Appended mediaIds={} to bookId={} for ownerUserId={}", mediaIds, bookId, ownerUserId);
+    } catch (Exception e) {
+      log.error(
+          "Error while appending media to bookId={} ownerUserId={}: ", bookId, ownerUserId, e);
+    }
+  }
+
+  @Transactional
+  public void appendValuationToBook(String bookId, String ownerUserId, Float bookCoinValue) {
+    try {
+      Optional<Book> myBookOpt = bookRepository.findByBookId(bookId);
+      if (myBookOpt.isEmpty()) {
+        log.info("Book not found when appending valuation: bookId={}", bookId);
+        return;
+      }
+
+      Book myBook = myBookOpt.get();
+      if (!myBook.getOwnerUserId().equals(ownerUserId)) {
+        log.warn(
+            "Owner mismatch when appending valuation: bookId={}, ownerUserId={}",
+            bookId,
+            ownerUserId);
+        return;
+      }
+
+      myBook.setValuation(bookCoinValue);
+      bookRepository.save(myBook);
+
+      outboxService.enqueueEvent(
+          AggregateType.BOOK, myBook.getBookId(), "BOOK_VALUATION_FINALIZED", myBook);
+      log.info(
+          "Appended valuation={} to bookId={} for ownerUserId={}",
+          bookCoinValue,
           bookId,
           ownerUserId);
-      return;
+    } catch (Exception e) {
+      log.error(
+          "Error while appending valuation to bookId={} ownerUserId={}: ", bookId, ownerUserId, e);
     }
-
-    Book book = bookOpt.get();
-    List<String> current = book.getMediaIds();
-    if (current == null) current = new java.util.ArrayList<>();
-
-    LinkedHashSet<String> mergedMediaIds = new LinkedHashSet<>(current);
-    mergedMediaIds.addAll(mediaIds);
-
-    if (mergedMediaIds.size() == current.size()) {
-      log.info("No new mediaIds to append for bookId={} ownerUserId={}", bookId, ownerUserId);
-      return;
-    }
-
-    book.setMediaIds(new ArrayList<>(mergedMediaIds));
-    bookRepository.save(book);
-
-    // Enqueue BOOK_MEDIA_FINALIZED event
-    // Payload is the full Book object with updated mediaIds
-    // Gets picked up by OutboxRelay to be sent to Kafka for ValuationService to process
-    outboxService.enqueueEvent(AggregateType.BOOK, book.getBookId(), "BOOK_MEDIA_FINALIZED", book);
-
-    log.info("Appended mediaIds={} to bookId={} for ownerUserId={}", mediaIds, bookId, ownerUserId);
   }
 
   private Book mapRequestToBook(BookRequest bookRequest, String keycloakId) {
