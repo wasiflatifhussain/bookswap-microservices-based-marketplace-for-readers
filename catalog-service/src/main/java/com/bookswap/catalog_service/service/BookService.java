@@ -201,6 +201,11 @@ public class BookService {
     book.setMediaIds(new ArrayList<>(mergedMediaIds));
     bookRepository.save(book);
 
+    // Enqueue BOOK_MEDIA_FINALIZED event
+    // Payload is the full Book object with updated mediaIds
+    // Gets picked up by OutboxRelay to be sent to Kafka for ValuationService to process
+    outboxService.enqueueEvent(AggregateType.BOOK, book.getBookId(), "BOOK_MEDIA_FINALIZED", book);
+
     log.info("Appended mediaIds={} to bookId={} for ownerUserId={}", mediaIds, bookId, ownerUserId);
   }
 

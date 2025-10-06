@@ -16,6 +16,7 @@ public class KafkaMediaEventsListener {
 
   private final ObjectMapper objectMapper;
   private final BookService bookService;
+  private final KafkaOutboxPublisher kafkaOutboxPublisher;
 
   @KafkaListener(
       topics = "${spring.kafka.consumer.services.media-service.topic}", // e.g. media.events
@@ -36,7 +37,7 @@ public class KafkaMediaEventsListener {
       switch (eventType) {
         case "MEDIA_STORED" -> {
           MediaStoredEvent e = objectMapper.readValue(rec.value(), MediaStoredEvent.class);
-          log.info("MEDIA_STORED bookId={} mediaId={}", e.getBookId(), e.getMediaIds());
+          log.info("MEDIA_STORED bookId={} mediaIds={}", e.getBookId(), e.getMediaIds());
           // idempotent update (BookService should upsert only if missing)
           bookService.appendMediaToBook(e.getBookId(), e.getOwnerUserId(), e.getMediaIds());
         }
