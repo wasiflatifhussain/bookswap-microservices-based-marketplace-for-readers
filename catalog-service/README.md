@@ -54,147 +54,133 @@ catalog-service/
 └── V1__init.sql                # Flyway migration
 ```
 
-## Authentication
+# Catalog Service
 
-All endpoints (except health/docs) require a valid access token.
+The Catalog Service manages book records, their metadata, and their state in the marketplace. It exposes REST endpoints
+for CRUD operations and participates in the event-driven workflow via Kafka.
 
-- Each request must have `Authorization: Bearer <token>`.
-- The token is introspected with Keycloak using the backend client.
-- Only active tokens are accepted; others get `401/403 Unauthorized`.
+## Endpoints
 
-See `security/KeycloakIntrospectionFilter.java` for details.
+### POST /api/catalog/books
 
-## Book Creation & Outbox Event Flow
-
-When a user wants to save a new book, the following flow is executed:
-
-### 1. User Submits Book Details
-
-**Frontend:**  
-User sends a multipart POST request to store book details and images.
-
-- **Endpoint:** `POST /api/catalog/books` (JSON metadata)
-
-**Catalog Service:**
-
-- **BEGIN TRANSACTION**
-    - `INSERT INTO books (bookId, status=DRAFT, valuation=NULL, mediaIds=[])`
-    - `INSERT INTO outbox_events (eventType=BOOK_CREATED, payload={book metadata})`
-- **COMMIT**
-
-- **CatalogRelay (background):**
-    - Detects new outbox row
-    - Publishes to Kafka topic `book.created`
-    - Marks outbox row as SENT
-
----
-
-### 2. User Uploads Book Images
-
-- **Endpoint:** `POST /api/media/books/{bookId}/images` (multipart photos)
-
-**Media Service:**
-
-- Stores files in S3/MinIO
-- Inserts media records in its DB
-- `INSERT INTO outbox_events (eventType=MEDIA_UPLOADED, payload={bookId, mediaIds, urls, thumbs})`
-- **MediaRelay:**
-    - Publishes Kafka `media.uploaded`
-    - Marks outbox row as SENT
+- Create a new book entry (initial state: DRAFT).
+- **Auth:** OAuth2 Bearer Token required.
+- **Request Body:**
+  ```json
+  {
+    "title": "Book Title",
+    "author": "Author Name",
+    "year": 2020,
+    "description": "Description...",
+    "genre": "FANTASY",
+    "condition": "GOOD",
+    "isbn": "optional",
+    "notes": "optional"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "bookId": "uuid",
+    "status": "DRAFT",
+    "mediaIds": [],
+    "valuation": null
+  }
+  ```
+- **Publishes Kafka Event:** `BOOK_CREATED` (topic: `catalog-events`)
 
 ---
 
-### 3. Valuation Service Consumes Events
+### GET /api/catalog/books/{bookId}
 
-- **Consumes:** `book.created` and `media.uploaded` from Kafka
-- Once it has book metadata and at least one image URL:
-    - Runs valuation job
-    - `INSERT INTO outbox_events (eventType=VALUATION_UPDATED, payload={bookId, valuation})`
-- **ValuationRelay:**
-    - Publishes Kafka `valuation.updated`
-    - Marks outbox row as SENT
-
----
-
-### 4. Catalog Service Consumes Events
-
-- **Consumes:**
-    - `media.uploaded` → `UPDATE books SET mediaIds = [...]`
-    - `valuation.updated` → `UPDATE books SET valuation = 12.5`
-
-- When both `valuation != NULL` **and** `mediaIds` is not empty:
-    - `UPDATE books SET status = LISTED`
-    - *(Optional)* Enqueue outbox event `BOOK_LISTED`
-    - **Relay:** Publishes Kafka `book.listed`
-
----
-
-### 5. Other Consumers
-
-- **Notification/Search Services:**  
-  Can consume `book.created` or `book.listed` to notify users or index feeds.
-
----
-
-```
-When user wants to save new book, frontend does a multipart POST to store book details + images.
-User → POST /api/catalog/books (JSON metadata)
-   Catalog:
-      BEGIN TX
-         INSERT INTO books (bookId, status=DRAFT, valuation=NULL, mediaIds=[])
-         INSERT INTO outbox_events (eventType=BOOK_CREATED, payload={book metadata})
-      COMMIT
-   → CatalogRelay (background) sees new outbox row
-      → publishes to Kafka topic "book.created"
-      → marks outbox row SENT
-
-User → POST /api/media/books/{bookId}/images (multipart photos)
-   Media Service:
-      - Stores files in S3/MinIO
-      - Inserts media records in its DB
-      - INSERT INTO outbox_events (eventType=MEDIA_UPLOADED, payload={bookId, mediaIds, urls, thumbs})
-   → MediaRelay publishes Kafka "media.uploaded"
-      → marks outbox row SENT
-
-Valuation Service ← Kafka "book.created"
-Valuation Service ← Kafka "media.uploaded"
-   - Once it has book metadata + at least one image URL:
-      - Runs valuation job
-      - INSERT INTO outbox_events (eventType=VALUATION_UPDATED, payload={bookId, valuation})
-   → ValuationRelay publishes Kafka "valuation.updated"
-      → marks outbox row SENT
-
-Catalog Consumer ← Kafka "media.uploaded"
-   → UPDATE books SET mediaIds = [...]
-
-Catalog Consumer ← Kafka "valuation.updated"
-   → UPDATE books SET valuation = 12.5
-
-Catalog:
-   - When both valuation != NULL AND mediaIds not empty:
-       → UPDATE books SET status = LISTED
-       → (optional) enqueue outbox event BOOK_LISTED
-       → Relay publishes Kafka "book.listed"
-```
-
-## Current Progress & TODOs
-
-### Catalog Service
-
-- Outbox pattern and event publishing to Kafka are implemented.
-- **Event listeners for valuation and media events are not yet implemented.**
-    - These will be added after the Valuation and Media services are developed.
+- Fetch details for a single book, including media and valuation if available.
+- **Auth:** OAuth2 Bearer Token required.
+- **Response:**
+  ```json
+  {
+    "bookId": "uuid",
+    "title": "...",
+    "author": "...",
+    "year": 2020,
+    "description": "...",
+    "genre": "...",
+    "condition": "...",
+    "status": "LISTED",
+    "media": [
+      {
+        "mediaId": "uuid",
+        "url": "https://...",
+        "expiresAt": "ISO8601"
+      }
+    ],
+    "valuation": {
+      "coins": 12.5,
+      "confidence": 0.95,
+      "policyVersion": "v1"
+    },
+    "ownerId": "user-uuid"
+  }
+  ```
 
 ---
 
-### Planned Next Steps
+### DELETE /api/catalog/books/{bookId}
 
-- [ ] Build Valuation and Media services.
-- [ ] Implement event listeners in Catalog Service:
-    - Listen to `valuation.events` (`BOOK_VALUATED`) → update `Book.valuation`
-    - Listen to `media.events` (`MEDIA_PROCESSED`) → update `Book.mediaId` / `thumbnailUrl`
-- [ ] Ensure idempotency using `outboxEventId` from incoming events.
-- [ ] Use `catalog-service` as the Kafka consumer group ID.
-- [ ] Test event-driven updates and document event payloads.
+- Unlist (logically delete) a book.
+- **Auth:** OAuth2 Bearer Token required.
+- **Response:**
+  ```json
+  {
+    "bookId": "uuid",
+    "status": "UNLISTED",
+    "reason": "User deleted"
+  }
+  ```
+- **Publishes Kafka Event:** `BOOK_UNLISTED` (topic: `catalog-events`)
 
 ---
+
+### GET /api/catalog/books/user/{userId}
+
+- List all books owned by a user.
+- **Auth:** OAuth2 Bearer Token required.
+- **Response:** List of book detail objects (see above).
+
+---
+
+### GET /api/catalog/books/recent?limit=20
+
+- List most recent listed books for homepage feed.
+- **Auth:** Not required.
+- **Response:** List of book detail objects.
+
+---
+
+## Kafka Events
+
+### Publishes:
+
+- `BOOK_CREATED`  
+  Emitted when a new book is created.
+- `BOOK_MEDIA_FINALIZED`  
+  Emitted after the service receives a `MEDIA_STORED` event from the Media Service, updates the book's media references,
+  and the book is ready for valuation.
+- `BOOK_UNLISTED`  
+  Emitted when a book is unlisted (deleted).
+
+### Consumes:
+
+- `MEDIA_STORED` (from `media.events`)  
+  On receiving this event, updates the book's media list. If the book now has all required media, emits
+  `BOOK_MEDIA_FINALIZED`.
+- `VALUATION_READY` (from `valuation.events`)  
+  Updates the book's valuation fields.
+
+---
+
+## Notes
+
+- All endpoints (except recent books) require authentication.
+- Media and valuation fields are updated asynchronously via Kafka events.
+- The Catalog Service does not store or serve images directly; it stores media IDs and fetches signed URLs from the
+  Media Service as needed.

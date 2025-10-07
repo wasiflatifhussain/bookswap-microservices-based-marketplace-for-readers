@@ -35,7 +35,6 @@ public class OutboxRelay {
 
         kafkaOutboxPublisher
             .publish(
-                e.getBookId(),
                 e.getAggregateType(),
                 e.getEventType(),
                 e.getAggregateId(),

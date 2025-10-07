@@ -18,7 +18,7 @@ public class KafkaMediaEventsListener {
   private final BookService bookService;
 
   @KafkaListener(
-      topics = "${spring.kafka.consumer.services.media-service.topic}", // e.g. media.events
+      topics = "${spring.kafka.consumer.services.media-service.topic}",
       groupId = "${spring.kafka.consumer.services.media-service.group-id}")
   public void onMediaEvent(ConsumerRecord<String, String> rec) {
     final String eventType = header(rec, "eventType");
@@ -36,9 +36,9 @@ public class KafkaMediaEventsListener {
       switch (eventType) {
         case "MEDIA_STORED" -> {
           MediaStoredEvent e = objectMapper.readValue(rec.value(), MediaStoredEvent.class);
-          log.info("MEDIA_STORED bookId={} mediaId={}", e.getBookId(), e.getMediaId());
+          log.info("MEDIA_STORED bookId={} mediaIds={}", e.getBookId(), e.getMediaIds());
           // idempotent update (BookService should upsert only if missing)
-          bookService.appendMediaToBook(e.getBookId(), e.getOwnerUserId(), e.getMediaId());
+          bookService.appendMediaToBook(e.getBookId(), e.getOwnerUserId(), e.getMediaIds());
         }
         default -> {
           log.debug("Ignored media eventType={} key={}", eventType, rec.key());

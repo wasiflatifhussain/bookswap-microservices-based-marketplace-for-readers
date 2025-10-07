@@ -14,16 +14,11 @@ public class OutboxService {
   private final ObjectMapper objectMapper;
 
   public void enqueueEvent(
-      AggregateType aggregateType,
-      String aggregateId,
-      String bookId,
-      String eventType,
-      Object eventPayload) {
+      AggregateType aggregateType, String aggregateId, String eventType, Object eventPayload) {
     try {
       String payload = objectMapper.writeValueAsString(eventPayload);
       OutboxEvent outboxEvent =
           OutboxEvent.builder()
-              .bookId(bookId)
               .aggregateType(aggregateType)
               .aggregateId(aggregateId)
               .eventType(eventType)

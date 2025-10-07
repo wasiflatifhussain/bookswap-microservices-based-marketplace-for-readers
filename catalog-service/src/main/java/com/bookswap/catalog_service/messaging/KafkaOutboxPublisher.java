@@ -39,6 +39,7 @@ public class KafkaOutboxPublisher {
           .add(
               new RecordHeader(
                   "aggregateType", aggregateType.name().getBytes(StandardCharsets.UTF_8)))
+          .add(new RecordHeader("aggregateId", aggregateId.getBytes(StandardCharsets.UTF_8)))
           .add(new RecordHeader("outboxEventId", outboxEventId.getBytes(StandardCharsets.UTF_8)));
 
       CompletableFuture<SendResult<String, String>> completableFuture = kafkaTemplate.send(record);

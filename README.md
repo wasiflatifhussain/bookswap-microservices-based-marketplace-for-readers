@@ -159,10 +159,10 @@ _Manages: All swap actions for the users_
     - Set the Content-Type header as specified in the response.
     - Body is the binary image data.
 
-- **POST /api/media/uploads/{mediaId}/complete**
-    - Confirms the upload for a specific media item.
+- **POST /api/media/uploads/{bookId}/complete**
+    - Confirms the media upload for a specific book.
     - Requires OAuth2 authentication.
-    - Marks the media as STORED and publishes an event to Kafka for the Catalog service.
+    - Marks the medias as STORED and publishes an event to Kafka for the Catalog service.
 
 - **GET /api/media/downloads/{bookId}/view**
     - Retrieves presigned S3 URLs for all images associated with a book.
@@ -579,3 +579,46 @@ go to postman and bookswap/keycloak folder
 - for logout, we made a temp logout endpoint on postman
 - it shud have no auth, and body shud have client_id=web-frontend
 - and shud be given refresh_token for that user (NOT token)
+
+--
+
+## Backend Workflow: Book Creation, Media, and Valuation
+
+This section summarizes the main workflow for registering a book, uploading images, and getting a valuation, showing how
+the frontend and microservices interact.
+
+### 1. Book Creation (Catalog Service)
+
+- **Frontend** calls `POST /api/catalog/books` with book metadata.
+- **Catalog Service** creates a new book entry (state = DRAFT).
+- **Catalog Service** publishes `BOOK_CREATED` event to Kafka.
+
+### 2. Image Upload (Media Service)
+
+- **Frontend** calls `POST /api/media/uploads/{bookId}/init` to get pre-signed S3 URLs for image upload.
+- **Media Service** creates media records (status = PENDING) and returns pre-signed S3 URLs.
+- **Frontend** uploads images directly to S3 using the pre-signed URLs (PUT, with correct Content-Type).
+- **Frontend** calls `POST /api/media/uploads/{mediaId}/complete` to confirm upload.
+- **Media Service** verifies the upload, marks media as STORED, and publishes `MEDIA_STORED` event to Kafka.
+
+### 3. Catalog Updates Media
+
+- **Catalog Service** listens for `MEDIA_STORED` events from Kafka.
+- On receiving the event, it updates the book's media list (e.g., sets primaryMediaId if not already set).
+- When all required media are present, **Catalog Service** publishes `BOOK_MEDIA_FINALIZED` event to Kafka.
+
+### 4. Book Valuation (Valuation Service - Planned)
+
+- **Valuation Service** listens for `BOOK_MEDIA_FINALIZED` events from Kafka.
+- On receiving the event, it fetches book metadata from Catalog and media from Media Service.
+- It passes the book and media to an LLM/AI to determine BookCoin value.
+- **Valuation Service** publishes `VALUATION_READY` event to Kafka.
+
+### 5. Catalog Updates Valuation
+
+- **Catalog Service** listens for `VALUATION_READY` events from Kafka.
+- On receiving the event, it updates the book's valuation field in the database.
+- The book entry is now fully created, with metadata, images, and valuation.
+
+This workflow ensures that book creation, media upload, and valuation are decoupled, reliable, and event-driven. Each
+service is responsible for its own data and state, and communicates changes via Kafka events.

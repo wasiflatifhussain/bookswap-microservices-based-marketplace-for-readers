@@ -116,70 +116,94 @@ public class MediaService {
     return new UploadInitResponse(bookId, results);
   }
 
-  public CompleteResponse completeUpload(String mediaId, String ownerUserId) {
-    log.info("Completing upload verification for mediaId={} ownerUserId={}", mediaId, ownerUserId);
+  public CompleteResponse completeUpload(String bookId, List<String> mediaIds, String ownerUserId) {
+    log.info("Initiating completion for {} mediaIds: {}", mediaIds.size(), mediaIds);
 
-    try {
-      Optional<Media> mediaOpt = mediaRepository.findById(mediaId);
-      if (mediaOpt.isEmpty()) {
-        return makeCompleteResponse(mediaId, null, Status.FAILED, "Media not found.");
-      }
+    List<CompleteResponse.Item> items = new ArrayList<>();
+    List<String> storedIds = new ArrayList<>();
 
-      Media mediaFound = mediaOpt.get();
-      if (mediaFound.getStatus() == Status.STORED) {
-        return makeCompleteResponse(
-            mediaId, mediaFound.getBookId(), Status.STORED, "Media already exists.");
-      }
-
+    for (String mediaId : mediaIds) {
       try {
-        HeadObjectResponse head = s3StorageService.headObjectResponse(mediaFound.getObjectKey());
-        if (head == null) {
-          return makeCompleteResponse(
-              mediaId, mediaFound.getBookId(), Status.FAILED, "Object not found.");
+        Optional<Media> mediaOpt = mediaRepository.findById(mediaId);
+        if (mediaOpt.isEmpty()) {
+          items.add(makeCompleteResponse(mediaId, null, Status.FAILED, "Media not found."));
+          continue;
         }
-        mediaFound.setMimeType(head.contentType());
-        mediaFound.setSizeBytes(head.contentLength());
-        mediaFound.setStatus(Status.STORED);
-        mediaRepository.save(mediaFound);
 
-        MediaStoredEvent mediaStoredEvent =
-            MediaStoredEvent.builder()
-                .bookId(mediaFound.getBookId())
-                .ownerUserId(mediaFound.getOwnerUserId())
-                .mediaId(mediaFound.getMediaId())
-                .build();
+        Media media = mediaOpt.get();
 
-        outboxService.enqueueEvent(
-            AggregateType.MEDIA,
-            mediaFound.getMediaId(),
-            mediaFound.getBookId(),
-            "MEDIA_STORED",
-            mediaStoredEvent);
+        // Ownership guard
+        if (ownerUserId != null && !ownerUserId.equals(media.getOwnerUserId())) {
+          items.add(
+              makeCompleteResponse(mediaId, media.getBookId(), Status.FAILED, "Owner mismatch."));
+          continue;
+        }
 
-        return makeCompleteResponse(
-            mediaFound.getMediaId(),
-            mediaFound.getBookId(),
-            Status.STORED,
-            "Media verified and stored successfully.");
+        // Book-Media Ownership guard
+        if (!bookId.equals(media.getBookId())) {
+          items.add(
+              makeCompleteResponse(mediaId, media.getBookId(), Status.FAILED, "Book mismatch."));
+          continue;
+        }
+
+        if (media.getStatus() == Status.STORED) {
+          // Include in storedIds so downstream can receive a complete set
+          storedIds.add(media.getMediaId());
+          items.add(
+              makeCompleteResponse(mediaId, media.getBookId(), Status.STORED, "Already stored."));
+          continue;
+        }
+
+        // Verify object exists in S3
+        HeadObjectResponse head = s3StorageService.headObjectResponse(media.getObjectKey());
+        if (head == null) {
+          items.add(
+              makeCompleteResponse(mediaId, media.getBookId(), Status.FAILED, "Object not found."));
+          continue;
+        }
+
+        // Persist metadata, mark STORED
+        media.setMimeType(head.contentType());
+        media.setSizeBytes(head.contentLength());
+        media.setStatus(Status.STORED);
+        mediaRepository.save(media);
+
+        storedIds.add(media.getMediaId());
+        items.add(
+            makeCompleteResponse(
+                mediaId, media.getBookId(), Status.STORED, "Stored successfully."));
+
       } catch (Exception e) {
-        log.warn(
-            "HeadObject failed for mediaId={} key={} (likely not uploaded yet).",
-            mediaId,
-            mediaFound.getObjectKey(),
-            e);
-
-        return makeCompleteResponse(
-            mediaId,
-            mediaFound.getBookId(),
-            Status.FAILED,
-            "Upload not found/accessible in storage.");
+        log.warn("CompleteUpload failed for mediaId={} with error:", mediaId, e);
+        items.add(
+            makeCompleteResponse(
+                mediaId, null, Status.FAILED, "Unexpected error completing upload."));
       }
-
-    } catch (Exception e) {
-      log.error("CompleteUpload failed for mediaId={} with error:", mediaId, e);
-      return makeCompleteResponse(
-          mediaId, null, Status.FAILED, "Unexpected error completing upload.");
     }
+
+    // Emit ONE batch event if at least one successful STORED
+    if (!storedIds.isEmpty()) {
+      MediaStoredEvent event =
+          MediaStoredEvent.builder()
+              .bookId(bookId)
+              .ownerUserId(ownerUserId)
+              .mediaIds(storedIds)
+              .count(storedIds.size())
+              .build();
+
+      outboxService.enqueueEvent(AggregateType.MEDIA, bookId, "MEDIA_STORED", event);
+
+    } else {
+      log.info("No media stored in this batch; skipping batch event publish.");
+    }
+    int successCount = (int) items.stream().filter(i -> i.status() == Status.STORED).count();
+
+    return CompleteResponse.builder()
+        .bookId(bookId)
+        .totalCount(mediaIds.size())
+        .successCount(successCount)
+        .items(items)
+        .build();
   }
 
   public List<MediaViewResponse> getMediaByBookId(String bookId) {
@@ -227,7 +251,7 @@ public class MediaService {
   }
 
   public void deleteMediaByBookId(String bookId, String ownerUserId) {
-    log.info("Deleting all media for bookId={} ownerUserId={}", bookId, ownerUserId);
+    log.info("Deleting all media for bookId={} for ownerUserId={}", bookId, ownerUserId);
 
     try {
       List<Media> mediaList = mediaRepository.findByBookIdAndStatus(bookId, Status.STORED);
@@ -237,30 +261,28 @@ public class MediaService {
         return;
       }
 
+      List<String> deletedIds = new ArrayList<>();
+
       for (Media media : mediaList) {
         try {
+          // Ownership guard (skip if not the same owner)
+          if (ownerUserId != null && !ownerUserId.equals(media.getOwnerUserId())) {
+            log.warn(
+                "Skip delete: owner mismatch for mediaId={} bookId={} (requestedBy={}, owner={})",
+                media.getMediaId(),
+                bookId,
+                ownerUserId,
+                media.getOwnerUserId());
+            continue;
+          }
+
           // Delete from S3
           s3StorageService.deleteObject(media.getObjectKey());
 
           // Delete from DB
           mediaRepository.deleteById(media.getMediaId());
 
-          // NOTE: consider if this can be adjusted or removed as it causes problem
-          // to catalog service and it creates a circular dependency
-          // (catalog -> media -> catalog)
-
-          // Record in outbox (for auditing / synchronization)
-          outboxService.enqueueEvent(
-              AggregateType.MEDIA,
-              media.getMediaId(),
-              media.getBookId(),
-              "MEDIA_DELETED",
-              Map.of(
-                  "bookId", media.getBookId(),
-                  "ownerUserId", media.getOwnerUserId(),
-                  "mediaId", media.getMediaId()));
-
-          log.info("Deleted mediaId={} for bookId={}", media.getMediaId(), bookId);
+          deletedIds.add(media.getMediaId());
 
         } catch (Exception e) {
           log.error(
@@ -272,6 +294,18 @@ public class MediaService {
         }
       }
 
+      if (deletedIds.isEmpty()) {
+        log.info("No stored media deleted for bookId={}", bookId);
+        return;
+      }
+
+      outboxService.enqueueEvent(
+          AggregateType.MEDIA,
+          bookId,
+          "MEDIA_DELETED",
+          Map.of("bookId", bookId, "ownerUserId", ownerUserId, "deletedMediaIds", deletedIds));
+
+      log.info("Published MEDIA_DELETED for bookId={} deletedIds={}", bookId, deletedIds);
     } catch (Exception e) {
       log.error("Error deleting media for bookId={}:", bookId, e);
     }
@@ -333,9 +367,9 @@ public class MediaService {
     return "%s/%s%s".formatted(safeBook, mediaId, ext);
   }
 
-  private CompleteResponse makeCompleteResponse(
+  private CompleteResponse.Item makeCompleteResponse(
       String mediaId, String bookId, Status status, String message) {
-    return CompleteResponse.builder()
+    return CompleteResponse.Item.builder()
         .mediaId(mediaId)
         .bookId(bookId)
         .status(status)

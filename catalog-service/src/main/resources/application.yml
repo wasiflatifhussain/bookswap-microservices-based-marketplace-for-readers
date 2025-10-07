@@ -24,6 +24,9 @@ spring:
         media-service:
           topic: media.events
           group-id: catalog-media-consumers
+        valuation-service:
+          topic: valuation.events
+          group-id: catalog-valuation-consumers
       auto-offset-reset: earliest
 
   

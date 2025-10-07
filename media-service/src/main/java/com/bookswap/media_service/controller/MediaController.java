@@ -26,11 +26,13 @@ public class MediaController {
     return ResponseEntity.ok(mediaService.initUploads(bookId, ownerUserId, body));
   }
 
-  @PostMapping("/uploads/{mediaId}/complete")
+  @PostMapping("/uploads/{bookId}/complete")
   public ResponseEntity<CompleteResponse> completeUpload(
-      @PathVariable String mediaId, Authentication authentication) {
+      @PathVariable String bookId,
+      @RequestBody List<String> mediaIds,
+      Authentication authentication) {
     String ownerUserId = authentication.getName();
-    return ResponseEntity.ok(mediaService.completeUpload(mediaId, ownerUserId));
+    return ResponseEntity.ok(mediaService.completeUpload(bookId, mediaIds, ownerUserId));
   }
 
   @GetMapping("/downloads/{bookId}/view")
