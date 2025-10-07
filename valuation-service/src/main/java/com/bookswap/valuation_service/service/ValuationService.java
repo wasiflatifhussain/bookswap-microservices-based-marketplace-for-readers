@@ -1,10 +1,14 @@
 package com.bookswap.valuation_service.service;
 
+import com.bookswap.valuation_service.client.gemini.dto.GeminiResponse;
+import com.bookswap.valuation_service.client.media.MediaServiceClient;
+import com.bookswap.valuation_service.client.media.dto.MediaResponse;
 import com.bookswap.valuation_service.domain.outbox.AggregateType;
 import com.bookswap.valuation_service.domain.valuation.Valuation;
 import com.bookswap.valuation_service.dto.event.BookFinalizedEvent;
 import com.bookswap.valuation_service.dto.event.BookUnlistedEvent;
 import com.bookswap.valuation_service.repository.ValuationRepository;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,22 +22,34 @@ public class ValuationService {
   private final ValuationRepository valuationRepository;
   private final OutboxService outboxService;
 
+  private final MediaServiceClient mediaServiceClient;
+  private final GeminiCallerService geminiCallerService;
+
   @Transactional
   public void computeBookValuation(BookFinalizedEvent bookFinalizedEvent) {
     try {
       Optional<Valuation> existingValuation =
           valuationRepository.findByBookId(bookFinalizedEvent.getBookId());
+
       if (existingValuation.isPresent()) {
         log.info("Valuation already exists for bookId={}", bookFinalizedEvent.getBookId());
         return;
       }
 
-      log.info("Book received for valuation={}", bookFinalizedEvent);
+      log.info("Book received for valuation with bookFinalizedEvent={}", bookFinalizedEvent);
+      List<MediaResponse> mediaResponseList =
+          mediaServiceClient.getMediaByBookId(bookFinalizedEvent.getBookId()).block();
 
-      // TODO: perform API call and perform book valuation
-      Float bookCoinValue = 10.00F;
-      String comments = "Test";
-      Valuation valuation = mapToValuationObj(bookFinalizedEvent, bookCoinValue, comments);
+      log.info("Successfully fetch media for book as mediaResponseList={}", mediaResponseList);
+
+      GeminiResponse geminiResponse =
+          geminiCallerService.generateValuation(bookFinalizedEvent, mediaResponseList);
+      log.info(
+          "Gemini response for bookId={} is geminiResponse={}",
+          bookFinalizedEvent.getBookId(),
+          geminiResponse);
+
+      Valuation valuation = mapToValuationObj(bookFinalizedEvent, geminiResponse);
       valuationRepository.save(valuation);
 
       outboxService.enqueueEvent(
@@ -45,12 +61,12 @@ public class ValuationService {
   }
 
   private Valuation mapToValuationObj(
-      BookFinalizedEvent bookFinalizedEvent, Float bookCoinValue, String comments) {
+      BookFinalizedEvent bookFinalizedEvent, GeminiResponse geminiResponse) {
     return Valuation.builder()
         .bookId(bookFinalizedEvent.getBookId())
         .ownerUserId(bookFinalizedEvent.getOwnerUserId())
-        .bookCoinValue(bookCoinValue)
-        .comments(comments)
+        .bookCoinValue(geminiResponse.getBookCoins())
+        .comments(geminiResponse.getComments())
         .build();
   }
 

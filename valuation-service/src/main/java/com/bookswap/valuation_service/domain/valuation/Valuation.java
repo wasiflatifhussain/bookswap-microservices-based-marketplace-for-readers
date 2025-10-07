@@ -26,5 +26,5 @@ public class Valuation {
   @Column(nullable = false)
   private Float bookCoinValue;
 
-  private String comments;
+  @Lob private String comments;
 }

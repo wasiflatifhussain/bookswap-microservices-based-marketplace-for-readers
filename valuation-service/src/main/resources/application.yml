@@ -1,6 +1,9 @@
 spring:
   application:
     name: valuation-service
+  output:
+    ansi:
+      enabled: ALWAYS
   datasource:
     url: jdbc:postgresql://localhost:5432/bookswap_valuation_db
     username: wasiflatifhussain
@@ -30,6 +33,15 @@ keycloak:
   introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
   client-id: bookswap-backend
   client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
+  token-uri: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token
+  service-service-comms-client:
+    client-id: service-service-comms
+    client-secret: 0v14E7eU4MkChgKuXnrryoByTrhSO5CD
+
+gemini:
+  api:
+    url: ${GEMINI_API_URL}
+    key: ${GEMINI_API_KEY}
 
 server:
   port: 8083
