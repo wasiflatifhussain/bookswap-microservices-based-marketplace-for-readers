@@ -22,7 +22,8 @@ public class Book {
   private String bookId;
 
   private String title;
-  private String description;
+
+  @Lob private String description;
 
   @Enumerated(EnumType.STRING)
   private BookGenre genre;
