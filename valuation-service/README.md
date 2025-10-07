@@ -94,6 +94,13 @@ For details:
 
 ---
 
+## No Controller-based Service
+
+This service does not have any controllers as it is not called by any external caller. It only listens to Kafka events
+from catalog service, calls media service and Gemini API, and publishes events to Kafka and its own DB. The catalog
+service will receive valuation details from the event and update the book object. Hence, that eliminates the need for
+any controller in this service.
+
 ## VPN Requirement
 
 **VVVIP Note:**

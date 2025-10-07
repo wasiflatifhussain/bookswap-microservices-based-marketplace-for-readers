@@ -1,6 +1,9 @@
 spring:
   application:
     name: media-service
+  output:
+    ansi:
+      enabled: ALWAYS
   datasource:
     url: jdbc:postgresql://localhost:5432/bookswap_media_db
     username: wasiflatifhussain
