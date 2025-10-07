@@ -225,7 +225,10 @@ public class MediaService {
               media -> {
                 try {
                   URL presignedUrl = s3PresignService.presignGetUrl(media.getObjectKey(), ttl);
-
+                  log.info(
+                      "Successfully generated presigned URL for mediaId={} expires at time={}",
+                      media.getMediaId(),
+                      expiresAt);
                   return MediaViewResponse.builder()
                       .mediaId(media.getMediaId())
                       .mimeType(media.getMimeType())
