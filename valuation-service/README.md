@@ -101,6 +101,15 @@ from catalog service, calls media service and Gemini API, and publishes events t
 service will receive valuation details from the event and update the book object. Hence, that eliminates the need for
 any controller in this service.
 
+## Running Locally
+
+Update your IDE's run configuration to include the following environment variables:
+
+| Variable         | Description                                          |
+|:-----------------|:-----------------------------------------------------|
+| `GEMINI_API_KEY` | Your personal API key for the Google Gemini API.     |
+| `GEMINI_API_URL` | The endpoint URL for the Gemini model you are using. |
+
 ## VPN Requirement
 
 **VVVIP Note:**
