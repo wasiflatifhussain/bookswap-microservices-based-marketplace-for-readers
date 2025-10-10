@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
 @Service
@@ -40,6 +41,7 @@ public class MediaService {
   @Value("${media.download.ttl.minutes:30}")
   private int downloadTtlMinutes;
 
+  @Transactional
   public UploadInitResponse initUploads(
       String bookId, String ownerUserId, UploadInitRequest uploadInitRequest) {
 
@@ -116,6 +118,7 @@ public class MediaService {
     return new UploadInitResponse(bookId, results);
   }
 
+  @Transactional
   public CompleteResponse completeUpload(String bookId, List<String> mediaIds, String ownerUserId) {
     log.info("Initiating completion for {} mediaIds: {}", mediaIds.size(), mediaIds);
 
@@ -206,6 +209,7 @@ public class MediaService {
         .build();
   }
 
+  @Transactional(readOnly = true)
   public List<MediaViewResponse> getMediaByBookId(String bookId) {
     log.info("Fetching media for bookId={}", bookId);
 
@@ -253,6 +257,7 @@ public class MediaService {
     }
   }
 
+  @Transactional
   public void deleteMediaByBookId(String bookId, String ownerUserId) {
     log.info("Deleting all media for bookId={} for ownerUserId={}", bookId, ownerUserId);
 
