@@ -6,6 +6,7 @@ import com.bookswap.valuation_service.repository.OutboxEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -13,6 +14,7 @@ public class OutboxService {
   private final OutboxEventRepository outboxEventRepository;
   private final ObjectMapper objectMapper;
 
+  @Transactional
   public void enqueueEvent(
       AggregateType aggregateType, String aggregateId, String eventType, Object eventPayload) {
     try {

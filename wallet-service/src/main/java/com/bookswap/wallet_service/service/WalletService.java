@@ -1,10 +1,15 @@
 package com.bookswap.wallet_service.service;
 
 import com.bookswap.wallet_service.domain.wallet.Wallet;
+import com.bookswap.wallet_service.domain.wallet.WalletReservation;
+import com.bookswap.wallet_service.dto.MutationType;
 import com.bookswap.wallet_service.dto.event.BookFinalizedEvent;
 import com.bookswap.wallet_service.dto.event.BookUnlistedEvent;
+import com.bookswap.wallet_service.dto.request.WalletMutationRequest;
 import com.bookswap.wallet_service.dto.response.BalanceResponse;
+import com.bookswap.wallet_service.dto.response.WalletMutationResponse;
 import com.bookswap.wallet_service.repository.WalletRepository;
+import com.bookswap.wallet_service.repository.WalletReservationRepository;
 import jakarta.validation.Valid;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
@@ -17,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class WalletService {
   private final WalletRepository walletRepository;
+  private final WalletReservationRepository walletReservationRepository;
 
+  @Transactional(readOnly = true)
   public BalanceResponse getUserBalance(String userId) {
     log.info("Searching for user wallet with userId={}", userId);
 
@@ -42,11 +49,12 @@ public class WalletService {
     }
   }
 
+  @Transactional
   public BalanceResponse addToUserWallet(String userId, BookFinalizedEvent finalizedEvent) {
     log.info("Initiating balance addition to userId={}", userId);
 
     try {
-      Optional<Wallet> walletOptional = walletRepository.findByUserId(userId);
+      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(userId);
       if (walletOptional.isEmpty()) {
         Wallet wallet =
             Wallet.builder()
@@ -90,7 +98,7 @@ public class WalletService {
       String userId, @Valid BookUnlistedEvent unlistedEvent) {
     log.info("Initiating balance deletion from userId={}", userId);
     try {
-      Optional<Wallet> walletOptional = walletRepository.findByUserId(userId);
+      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(userId);
       if (walletOptional.isEmpty()) {
         log.info("No wallet found for userId={}", userId);
         return mapToBalanceResponse(userId, 0F, 0F, "No wallet found for userId=" + userId);
@@ -123,10 +131,302 @@ public class WalletService {
     }
   }
 
+  @Transactional
+  public WalletMutationResponse reserveUserBalance(
+      String userId, @Valid WalletMutationRequest walletMutationRequest) {
+
+    log.info("Initiating balance reservation for userId={}", userId);
+
+    Float reqAmount = walletMutationRequest.getAmount();
+    if (reqAmount == null || reqAmount.isNaN() || reqAmount.isInfinite() || reqAmount <= 0F) {
+      log.info("Invalid amount provided for reservation for userId={}", userId);
+      return mapToWalletMutationResponse(
+          userId,
+          walletMutationRequest.getBookId(),
+          walletMutationRequest.getSwapId(),
+          reqAmount,
+          walletMutationRequest.getMutationType(),
+          0F,
+          0F,
+          "Invalid amount provided for reservation for userId=" + userId);
+    }
+
+    // NOTE: we need to account for floating point precision issues when comparing floats
+    final Float errorMargin = 0.0001F;
+
+    try {
+      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(userId);
+      if (walletOptional.isEmpty()) {
+        log.info("No books or available amount exist for user with userId={}", userId);
+        return mapToWalletMutationResponse(
+            userId,
+            walletMutationRequest.getBookId(),
+            walletMutationRequest.getSwapId(),
+            walletMutationRequest.getAmount(),
+            walletMutationRequest.getMutationType(),
+            0F,
+            0F,
+            "No books or available amount exist for user with userId=" + userId);
+      }
+
+      Wallet wallet = walletOptional.get();
+      if (walletMutationRequest.getAmount() - wallet.getAvailableAmount() > errorMargin) {
+        log.info(
+            "Valuation of book to be reserved is greater than available amount for userId={}",
+            userId);
+        return mapToWalletMutationResponse(
+            userId,
+            walletMutationRequest.getBookId(),
+            walletMutationRequest.getSwapId(),
+            walletMutationRequest.getAmount(),
+            walletMutationRequest.getMutationType(),
+            wallet.getAvailableAmount(),
+            wallet.getReservedAmount(),
+            "Valuation of book to be reserved is greater than available amount for userId="
+                + userId);
+      }
+
+      float newAvailableAmount = wallet.getAvailableAmount() - walletMutationRequest.getAmount();
+      float newReservedAmount = wallet.getReservedAmount() + walletMutationRequest.getAmount();
+      if (newAvailableAmount < 0F && Math.abs(newAvailableAmount) < errorMargin) {
+        newAvailableAmount = 0F;
+      }
+
+      wallet.setAvailableAmount(newAvailableAmount);
+      wallet.setReservedAmount(newReservedAmount);
+
+      WalletReservation walletReservation =
+          WalletReservation.builder()
+              .userId(userId)
+              .bookId(walletMutationRequest.getBookId())
+              .swapId(walletMutationRequest.getSwapId())
+              .amount(walletMutationRequest.getAmount())
+              .build();
+      walletReservationRepository.save(walletReservation);
+
+      log.info(
+          "Successfully reserved amount for user with userId={} and current availableAmount={} and reservedAmount={}",
+          userId,
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount());
+      return mapToWalletMutationResponse(
+          userId,
+          walletMutationRequest.getBookId(),
+          walletMutationRequest.getSwapId(),
+          walletMutationRequest.getAmount(),
+          walletMutationRequest.getMutationType(),
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount(),
+          "Balanced reserved successfully");
+    } catch (Exception e) {
+      log.error(
+          "Failed to reserve from wallet for userId={} with error e={}", userId, e.getMessage(), e);
+      throw e;
+    }
+  }
+
+  @Transactional
+  public WalletMutationResponse releaseUserBalance(
+      String userId, @Valid WalletMutationRequest walletMutationRequest) {
+    log.info("Initiating balance release for userId={}", userId);
+
+    final float errorMargin = 0.0001F;
+
+    try {
+      Optional<WalletReservation> walletReservationOptional =
+          walletReservationRepository.findByUserIdAndBookId(
+              userId, walletMutationRequest.getBookId());
+
+      if (walletReservationOptional.isEmpty()) {
+        log.info(
+            "No book entry exist for bookId={} and userId={}",
+            walletMutationRequest.getBookId(),
+            userId);
+
+        return mapToWalletMutationResponse(
+            userId,
+            walletMutationRequest.getBookId(),
+            walletMutationRequest.getSwapId(),
+            walletMutationRequest.getAmount(),
+            walletMutationRequest.getMutationType(),
+            0F,
+            0F,
+            "No book entry exist for bookId="
+                + walletMutationRequest.getBookId()
+                + " userId="
+                + userId);
+      }
+
+      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(userId);
+      if (walletOptional.isEmpty()) {
+        log.info("No books or available amount exist for user with userId={}", userId);
+        return mapToWalletMutationResponse(
+            userId,
+            walletMutationRequest.getBookId(),
+            walletMutationRequest.getSwapId(),
+            walletMutationRequest.getAmount(),
+            walletMutationRequest.getMutationType(),
+            0F,
+            0F,
+            "No books or available amount exist for user with userId=" + userId);
+      }
+
+      WalletReservation walletReservation = walletReservationOptional.get();
+      Wallet wallet = walletOptional.get();
+
+      if (wallet.getAvailableAmount() == null) wallet.setAvailableAmount(0F);
+      if (wallet.getReservedAmount() == null) wallet.setReservedAmount(0F);
+
+      Float releaseAmount = walletReservation.getAmount();
+      if (releaseAmount == null || releaseAmount.isNaN() || releaseAmount.isInfinite()) {
+        releaseAmount = 0F;
+      }
+
+      float newReservedAmount = wallet.getReservedAmount() - releaseAmount;
+      if (newReservedAmount < 0F && Math.abs(newReservedAmount) < errorMargin) {
+        newReservedAmount = 0F;
+      }
+      Float newAvailableAmount = wallet.getAvailableAmount() + releaseAmount;
+
+      wallet.setAvailableAmount(newAvailableAmount);
+      wallet.setReservedAmount(newReservedAmount);
+
+      walletReservationRepository.delete(walletReservation);
+
+      log.info(
+          "Successfully released reserved amount for user with userId={} and current availableAmount={} and reservedAmount={}",
+          userId,
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount());
+      return mapToWalletMutationResponse(
+          userId,
+          walletMutationRequest.getBookId(),
+          walletMutationRequest.getSwapId(),
+          walletMutationRequest.getAmount(),
+          walletMutationRequest.getMutationType(),
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount(),
+          "Balanced released successfully");
+
+    } catch (Exception e) {
+      log.info(
+          "Failed to release from wallet for userId={} with error e={}", userId, e.getMessage(), e);
+      throw e;
+    }
+  }
+
+  @Transactional
+  public WalletMutationResponse confirmSwapSuccess(
+      String userId, @Valid WalletMutationRequest walletMutationRequest) {
+    log.info("Initiating swap confirmation for userId={}", userId);
+
+    try {
+      Optional<WalletReservation> walletReservationOptional =
+          walletReservationRepository.findByUserIdAndBookId(
+              userId, walletMutationRequest.getBookId());
+
+      if (walletReservationOptional.isEmpty()) {
+        log.info(
+            "No book entry exist for bookId={} and userId={}",
+            walletMutationRequest.getBookId(),
+            userId);
+
+        return mapToWalletMutationResponse(
+            userId,
+            walletMutationRequest.getBookId(),
+            walletMutationRequest.getSwapId(),
+            walletMutationRequest.getAmount(),
+            walletMutationRequest.getMutationType(),
+            0F,
+            0F,
+            "No book entry exist for bookId="
+                + walletMutationRequest.getBookId()
+                + " userId="
+                + userId);
+      }
+
+      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(userId);
+      if (walletOptional.isEmpty()) {
+        log.info("No books or available amount exist for user with userId={}", userId);
+        return mapToWalletMutationResponse(
+            userId,
+            walletMutationRequest.getBookId(),
+            walletMutationRequest.getSwapId(),
+            walletMutationRequest.getAmount(),
+            walletMutationRequest.getMutationType(),
+            0F,
+            0F,
+            "No books or available amount exist for user with userId=" + userId);
+      }
+
+      WalletReservation walletReservation = walletReservationOptional.get();
+      Wallet wallet = walletOptional.get();
+
+      if (wallet.getReservedAmount() == null) wallet.setReservedAmount(0F);
+
+      Float confirmAmount = walletReservation.getAmount();
+      if (confirmAmount == null || confirmAmount.isNaN() || confirmAmount.isInfinite()) {
+        confirmAmount = 0F;
+      }
+
+      float newReservedAmount = wallet.getReservedAmount() - confirmAmount;
+      if (newReservedAmount < 0F) {
+        newReservedAmount = 0F;
+      }
+
+      wallet.setReservedAmount(newReservedAmount);
+
+      walletReservationRepository.delete(walletReservation);
+
+      log.info(
+          "Successfully confirmed swap and deducted reserved amount for user with userId={} and current availableAmount={} and reservedAmount={}",
+          userId,
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount());
+      return mapToWalletMutationResponse(
+          userId,
+          walletMutationRequest.getBookId(),
+          walletMutationRequest.getSwapId(),
+          walletMutationRequest.getAmount(),
+          walletMutationRequest.getMutationType(),
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount(),
+          "Swap confirmed and reserved amount deducted successfully");
+    } catch (Exception e) {
+      log.info(
+          "Failed to confirm swap for wallet for userId={} with error e={}",
+          userId,
+          e.getMessage(),
+          e);
+      throw e;
+    }
+  }
+
   private BalanceResponse mapToBalanceResponse(
       String userId, Float availableAmount, Float reservedAmount, String message) {
     return BalanceResponse.builder()
         .userId(userId)
+        .availableAmount(availableAmount)
+        .reservedAmount(reservedAmount)
+        .message(message)
+        .build();
+  }
+
+  private WalletMutationResponse mapToWalletMutationResponse(
+      String userId,
+      String bookId,
+      String swapId,
+      Float amount,
+      MutationType mutationType,
+      Float availableAmount,
+      Float reservedAmount,
+      String message) {
+    return WalletMutationResponse.builder()
+        .userId(userId)
+        .bookId(bookId)
+        .swapId(swapId)
+        .amount(amount)
+        .mutationType(mutationType)
         .availableAmount(availableAmount)
         .reservedAmount(reservedAmount)
         .message(message)

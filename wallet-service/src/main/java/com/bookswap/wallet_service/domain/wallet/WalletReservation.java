@@ -32,9 +32,6 @@ public class WalletReservation {
   @Column(nullable = false)
   private Float amount;
 
-  @Column(nullable = false)
-  private String status;
-
   @CreationTimestamp private LocalDateTime createdAt;
 
   @UpdateTimestamp private LocalDateTime updatedAt;

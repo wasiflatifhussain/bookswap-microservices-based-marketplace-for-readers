@@ -57,6 +57,7 @@ public class BookService {
     }
   }
 
+  @Transactional(readOnly = true)
   public BookDetailedResponse getBookByBookId(String bookId) {
     log.info("Initiating search for book by bookId={}", bookId);
 
@@ -74,6 +75,7 @@ public class BookService {
     }
   }
 
+  @Transactional(readOnly = true)
   public BookDetailedResponse[] getBooksByUserId(String userId) {
     log.info("Initiating search for books by userId={}", userId);
 
@@ -121,6 +123,7 @@ public class BookService {
     }
   }
 
+  @Transactional(readOnly = true)
   public BookDetailedResponse[] getRecentListedBooks(int limit) {
     try {
       List<Book> books =
@@ -142,6 +145,7 @@ public class BookService {
     }
   }
 
+  @Transactional(readOnly = true)
   public BookDetailedResponse[] getMatchingBooks(String bookId, double tolerance) {
     try {
       Optional<Book> myBookOpt = bookRepository.findByBookId(bookId);

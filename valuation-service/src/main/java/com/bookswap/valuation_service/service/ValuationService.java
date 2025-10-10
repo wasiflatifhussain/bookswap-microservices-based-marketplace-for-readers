@@ -60,16 +60,6 @@ public class ValuationService {
     }
   }
 
-  private Valuation mapToValuationObj(
-      BookFinalizedEvent bookFinalizedEvent, GeminiResponse geminiResponse) {
-    return Valuation.builder()
-        .bookId(bookFinalizedEvent.getBookId())
-        .ownerUserId(bookFinalizedEvent.getOwnerUserId())
-        .bookCoinValue(geminiResponse.getBookCoins())
-        .comments(geminiResponse.getComments())
-        .build();
-  }
-
   @Transactional
   public void deleteValuationByBookId(String bookId, String ownerUserId) {
     log.info("Deleting valuation for bookId={} for ownerUserId={}", bookId, ownerUserId);
@@ -99,5 +89,15 @@ public class ValuationService {
     } catch (Exception e) {
       log.error("Error deleting valuation for bookId={}:", bookId, e);
     }
+  }
+
+  private Valuation mapToValuationObj(
+      BookFinalizedEvent bookFinalizedEvent, GeminiResponse geminiResponse) {
+    return Valuation.builder()
+        .bookId(bookFinalizedEvent.getBookId())
+        .ownerUserId(bookFinalizedEvent.getOwnerUserId())
+        .bookCoinValue(geminiResponse.getBookCoins())
+        .comments(geminiResponse.getComments())
+        .build();
   }
 }
