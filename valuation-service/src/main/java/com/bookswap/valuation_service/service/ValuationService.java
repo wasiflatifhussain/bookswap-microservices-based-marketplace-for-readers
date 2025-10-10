@@ -82,7 +82,11 @@ public class ValuationService {
       }
 
       BookUnlistedEvent unlistedEvent =
-          BookUnlistedEvent.builder().bookId(bookId).ownerUserId(ownerUserId).build();
+          BookUnlistedEvent.builder()
+              .bookId(bookId)
+              .ownerUserId(ownerUserId)
+              .valuation(existingValuation.get().getBookCoinValue())
+              .build();
 
       valuationRepository.deleteByBookId(bookId);
       outboxService.enqueueEvent(

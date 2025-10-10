@@ -60,7 +60,7 @@ Auth: user JWT for /me/balance; service tokens (Swap/Catalog/admin) for others.
 
 - Catalog/Valuation publishes the event.
 - Wallet consumes (from Catalog/Valuation)
-    - Topic(s): `catalog.events` BOOK_VALUATION_COMPUTED
+    - Topic(s): `catalog.events` BOOK_VALUATION_FINALIZED
     - Wallet consumer:
         - Upsert account if needed.
         - Transaction: lock row; available += bookCoins.
@@ -85,7 +85,7 @@ Auth: user JWT for /me/balance; service tokens (Swap/Catalog/admin) for others.
 
 ### Book Add (Valuation Computed) — Kafka-driven
 
-- Catalog/Valuation emits BOOK_VALUATION_COMPUTED.
+- Catalog/Valuation emits BOOK_VALUATION_FINALIZED.
 - Wallet consumer:
     - Upsert wallet_account (if missing).
     - Lock row; available += bookCoins.
@@ -106,3 +106,7 @@ Auth: user JWT for /me/balance; service tokens (Swap/Catalog/admin) for others.
 - Reserve: Swap → /reserve → available -= amount, reserved += amount, wallet_reservation: ACTIVE.
 - Release: Swap → /release → reserved -= amount, available += amount, reservation → RELEASED.
 - Capture: Swap → /capture → reserved -= amount, reservation → CAPTURED (final debit).
+
+NOTE:
+as this service only listens to events, we dont rlly need to write events to Kafka from him as no one reads them
+so we only need kafka listener and do not need kafka publisher or outbox

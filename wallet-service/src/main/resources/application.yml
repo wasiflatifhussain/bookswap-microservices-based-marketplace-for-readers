@@ -1,11 +1,11 @@
 spring:
   application:
-    name: valuation-service
+    name: wallet-service
   output:
     ansi:
       enabled: ALWAYS
   datasource:
-    url: jdbc:postgresql://localhost:5432/bookswap_valuation_db
+    url: jdbc:postgresql://localhost:5432/bookswap_wallet_db
     username: wasiflatifhussain
     password: password
     hikari:
@@ -25,28 +25,24 @@ spring:
       acks: all
       enable-idempotence: true
       services:
-        valuation-service:
-          topic: valuation.events
+        wallet-service:
+          topic: wallet.events
     consumer:
       services:
         catalog-service:
           topic: catalog.events
-          group-id: valuation-catalog-consumers
+          group-id: wallet-catalog-consumers
       auto-offset-reset: earliest
+
+server:
+  port: 8084
+
 
 keycloak:
   introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
   client-id: bookswap-backend
   client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
-  token-uri: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token
-  service-service-comms-client:
-    client-id: service-service-comms
-    client-secret: 0v14E7eU4MkChgKuXnrryoByTrhSO5CD
 
-gemini:
-  api:
-    url: ${GEMINI_API_URL}
-    key: ${GEMINI_API_KEY}
-
-server:
-  port: 8083
+outbox:
+  relay:
+    fixedDelayMs: 10000

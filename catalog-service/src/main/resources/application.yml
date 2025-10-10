@@ -1,14 +1,22 @@
 spring:
   application:
     name: catalog-service
+  output:
+    ansi:
+      enabled: ALWAYS
   datasource:
     url: jdbc:postgresql://localhost:5432/bookswap_catalog_db
     username: wasiflatifhussain
     password: password
+    hikari:
+      auto-commit: false
   jpa:
     hibernate:
       ddl-auto: update
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        jdbc.lob.non_contextual_creation: true
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -28,11 +36,6 @@ spring:
           topic: valuation.events
           group-id: catalog-valuation-consumers
       auto-offset-reset: earliest
-
-  
-  output:
-    ansi:
-      enabled: ALWAYS
 
 server:
   port: 8081

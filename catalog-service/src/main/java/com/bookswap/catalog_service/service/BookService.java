@@ -108,6 +108,7 @@ public class BookService {
           BookUnlistedEvent.builder()
               .bookId(book.getBookId())
               .ownerUserId(book.getOwnerUserId())
+              .valuation(book.getValuation())
               .build();
 
       // NOTE: This also puts an entry in Outbox table for audit - Outbox is an append-only log

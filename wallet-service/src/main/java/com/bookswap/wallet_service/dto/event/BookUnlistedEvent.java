@@ -1,4 +1,4 @@
-package com.bookswap.catalog_service.dto.event;
+package com.bookswap.wallet_service.dto.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
