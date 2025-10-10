@@ -1,5 +1,13 @@
 # Wallet Service API Reference
 
+## Overview
+
+The Wallet Service manages user wallet balances and reservations for book transactions. It provides endpoints to add to
+a user's wallet, view wallet balances, and handle reservations for book swaps. All operations are atomic and use
+row-level locking for consistency.
+
+---
+
 ## HTTP Endpoints
 
 ### User-facing
@@ -107,6 +115,26 @@ Auth: user JWT for /me/balance; service tokens (Swap/Catalog/admin) for others.
 - Release: Swap → /release → reserved -= amount, available += amount, reservation → RELEASED.
 - Capture: Swap → /capture → reserved -= amount, reservation → CAPTURED (final debit).
 
-NOTE:
-as this service only listens to events, we dont rlly need to write events to Kafka from him as no one reads them
-so we only need kafka listener and do not need kafka publisher or outbox
+---
+
+## Implementation Notes
+
+- **No Kafka Publishers:**
+    - The wallet service only listens to events (such as book valuation or swap completion) and updates the wallet
+      accordingly. It does not publish events to Kafka because no other service needs to consume wallet events directly.
+      This design keeps the wallet logic simple and avoids unnecessary event propagation.
+
+- **Database Locking:**
+    - Some wallet operations (such as reserving or releasing book coins) use row-level locking during database
+      transactions. This ensures atomicity and consistency, preventing concurrent modifications that could lead to
+      incorrect balances or double spending.
+    - Locking is achieved using transactional annotations and, where necessary, explicit locking queries.
+
+- **Error Handling:**
+    - All service methods include exception handling to log errors and return informative responses to the frontend.
+    - If a wallet row does not exist for a user, the service creates one as needed.
+
+---
+
+**Note:** The wallet service is designed for atomic, consistent updates to user balances. All critical operations are
+wrapped in transactions to ensure data integrity.
