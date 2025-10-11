@@ -2,6 +2,7 @@ package com.bookswap.catalog_service.repository;
 
 import com.bookswap.catalog_service.domain.book.Book;
 import com.bookswap.catalog_service.domain.book.BookStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -28,4 +29,6 @@ public interface BookRepository extends JpaRepository<Book, String> {
       Pageable pageable);
 
   Optional<Book> findByBookIdAndOwnerUserId(String bookId, String ownerUserId);
+
+  List<Book> findAllByBookIdIn(Collection<String> ids);
 }

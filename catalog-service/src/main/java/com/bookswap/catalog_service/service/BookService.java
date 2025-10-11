@@ -5,14 +5,15 @@ import com.bookswap.catalog_service.domain.book.BookStatus;
 import com.bookswap.catalog_service.domain.outbox.AggregateType;
 import com.bookswap.catalog_service.dto.event.BookCreatedEvent;
 import com.bookswap.catalog_service.dto.event.BookUnlistedEvent;
+import com.bookswap.catalog_service.dto.request.BookIdList;
 import com.bookswap.catalog_service.dto.request.BookRequest;
 import com.bookswap.catalog_service.dto.response.BookDetailedResponse;
+import com.bookswap.catalog_service.dto.response.BookResponseWithMedia;
 import com.bookswap.catalog_service.dto.response.BookSimpleResponse;
 import com.bookswap.catalog_service.repository.BookRepository;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -254,6 +255,112 @@ public class BookService {
       log.error(
           "Error while appending valuation to bookId={} ownerUserId={}: ", bookId, ownerUserId, e);
     }
+  }
+
+  @Transactional(readOnly = true)
+  public List<BookResponseWithMedia> getBooksByBulkBookIdOrder(BookIdList bookIdList) {
+    log.info("Initiating bulk book fetch for bookIdList={}", bookIdList);
+
+    try {
+      if (bookIdList == null
+          || bookIdList.getBookIds() == null
+          || bookIdList.getBookIds().isEmpty()) {
+        log.warn("No bookIds provided. bookIdList={}", bookIdList);
+        return List.of();
+      }
+
+      // De-dup while preserving input order
+      List<String> inputOrder = new ArrayList<>(new LinkedHashSet<>(bookIdList.getBookIds()));
+
+      // Single bulk fetch
+      List<Book> booksFound = bookRepository.findAllByBookIdIn(inputOrder);
+
+      // Index by id (for re-ordering to match request)
+      Map<String, Book> indexedById =
+          booksFound.stream()
+              .collect(Collectors.toMap(Book::getBookId, Function.identity(), (a, b) -> a));
+
+      return inputOrder.stream()
+          .map(indexedById::get)
+          .filter(Objects::nonNull)
+          .map(
+              book ->
+                  BookResponseWithMedia.builder()
+                      .bookId(book.getBookId())
+                      .title(book.getTitle())
+                      .description(book.getDescription())
+                      .author(book.getAuthor())
+                      .valuation(book.getValuation())
+                      .ownerUserId(book.getOwnerUserId())
+                      .primaryMediaId(firstOrNull(book.getMediaIds()))
+                      .build())
+          .toList();
+    } catch (Exception e) {
+      log.info("Error fetching books with error={}", e.getMessage());
+      return List.of(BookResponseWithMedia.builder().build());
+    }
+  }
+
+  @Transactional
+  public Boolean reserveBookForSwap(String bookId) {
+    log.info("Initiating reservation for book by bookId={}", bookId);
+    try {
+      Optional<Book> bookOpt = bookRepository.findByBookId(bookId);
+      if (bookOpt.isEmpty()) {
+        log.warn("Book not found for reservation and bookId={}", bookId);
+        return false;
+      }
+      Book book = bookOpt.get();
+      if (book.getBookStatus() != BookStatus.AVAILABLE) {
+        log.warn(
+            "Book not available for reservation with bookId={} and currentStatus={}",
+            bookId,
+            book.getBookStatus());
+        return false;
+      }
+
+      book.setBookStatus(BookStatus.RESERVED);
+      bookRepository.save(book);
+      log.info("Book reserved successfully for bookId={}", bookId);
+      return true;
+
+    } catch (Exception e) {
+      log.error("Error while reserving book with error=", e);
+      return false;
+    }
+  }
+
+  @Transactional
+  public Boolean unreserveBookForSwap(String bookId) {
+    log.info("Initiating un-reservation for book by bookId={}", bookId);
+    try {
+      Optional<Book> bookOpt = bookRepository.findByBookId(bookId);
+      if (bookOpt.isEmpty()) {
+        log.warn("Book not found for un-reservation and bookId={}", bookId);
+        return false;
+      }
+      Book book = bookOpt.get();
+      if (book.getBookStatus() != BookStatus.RESERVED) {
+        log.warn(
+            "Book not reserved currently for un-reservation with bookId={} and currentStatus={}",
+            bookId,
+            book.getBookStatus());
+        return false;
+      }
+
+      book.setBookStatus(BookStatus.AVAILABLE);
+      bookRepository.save(book);
+      log.info("Book un-reserved successfully for bookId={}", bookId);
+      return true;
+
+    } catch (Exception e) {
+      log.error("Error while un-reserving book with error=", e);
+      return false;
+    }
+  }
+
+  private static <T> T firstOrNull(List<T> list) {
+    return (list != null && !list.isEmpty()) ? list.get(0) : null;
   }
 
   private Book mapRequestToBook(BookRequest bookRequest, String keycloakId) {
