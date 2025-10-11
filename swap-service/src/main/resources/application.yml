@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: swap-service
+  output:
+    ansi:
+      enabled: ALWAYS
+    datasource:
+      url: jdbc:postgresql://localhost:5432/bookswap_swap_db
+      username: wasiflatifhussain
+      password: password
+      hikari:
+        auto-commit: false
+    jpa:
+      hibernate:
+        ddl-auto: update
+      database-platform: org.hibernate.dialect.PostgreSQLDialect
+      properties:
+        hibernate:
+          jdbc.lob.non_contextual_creation: true
+    kafka:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      producer:
+        key-serializer: org.apache.kafka.common.serialization.StringSerializer
+        value-serializer: org.apache.kafka.common.serialization.StringSerializer
+        acks: all
+        enable-idempotence: true
+        services:
+          swap-service:
+            topic: swap.events
+
+server:
+  port: 8085
+
+keycloak:
+  introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
+  client-id: bookswap-backend
+  client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
+
+outbox:
+  relay:
+    fixedDelayMs: 10000
