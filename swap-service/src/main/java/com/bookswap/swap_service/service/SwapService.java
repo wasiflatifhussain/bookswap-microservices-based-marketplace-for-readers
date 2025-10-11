@@ -7,10 +7,12 @@ import com.bookswap.swap_service.client.catalog.dto.BookResponseWithMedia;
 import com.bookswap.swap_service.client.wallet.WalletServiceClient;
 import com.bookswap.swap_service.client.wallet.dto.WalletMutationRequest;
 import com.bookswap.swap_service.client.wallet.dto.WalletMutationResponse;
+import com.bookswap.swap_service.domain.event.SwapCancelEvent;
 import com.bookswap.swap_service.domain.event.SwapCreatedEvent;
 import com.bookswap.swap_service.domain.outbox.AggregateType;
 import com.bookswap.swap_service.domain.swap.Swap;
 import com.bookswap.swap_service.domain.swap.SwapStatus;
+import com.bookswap.swap_service.dto.request.CancelSwapDTO;
 import com.bookswap.swap_service.dto.request.CreateSwapDTO;
 import com.bookswap.swap_service.dto.response.SwapResponse;
 import com.bookswap.swap_service.repository.SwapRepository;
@@ -73,6 +75,77 @@ public class SwapService {
     }
   }
 
+  @Transactional(readOnly = true)
+  public List<SwapResponse> getReceivedRequests(String responderUserId, SwapStatus swapStatus) {
+    log.info(
+        "Initiating getting received requests for responderUserId={} with swapStatus={}",
+        responderUserId,
+        swapStatus);
+
+    try {
+      List<Swap> swaps =
+          swapRepository.findByResponderUserIdAndSwapStatus(responderUserId, swapStatus);
+      if (swaps.isEmpty()) {
+        log.info(
+            "No requests found for user with responderUserId={} and swapStatus={}",
+            responderUserId,
+            swapStatus);
+        return mapToSwapResponses(
+            List.of(Swap.builder().responderUserId(responderUserId).swapStatus(swapStatus).build()),
+            Map.of(),
+            "No requests found for user with this responderUserId and swapStatus");
+      }
+
+      Set<String> bookIds = collectBookIds(swaps);
+
+      Map<String, BookResponseWithMedia> bookMap = makeBookMap(bookIds);
+
+      return mapToSwapResponses(swaps, bookMap, "Book found successfully");
+
+    } catch (Exception e) {
+      log.error(
+          "Error occurred while fetching requests for responderUserId={} with swapStatus={} and error={}",
+          responderUserId,
+          swapStatus,
+          e.getMessage());
+      return mapToSwapResponses(
+          List.of(Swap.builder().responderUserId(responderUserId).swapStatus(swapStatus).build()),
+          Map.of(),
+          "Error occurred while processing the request");
+    }
+  }
+
+  @Transactional(readOnly = true)
+  public List<SwapResponse> getRequestsForBook(String userId, String bookId) {
+    log.info("Initiating getting requests for userId={} and bookId={}", userId, bookId);
+
+    try {
+      List<Swap> swaps = swapRepository.findByResponderUserIdAndResponderBookId(userId, bookId);
+      if (swaps.isEmpty()) {
+        log.info("No requests found for userId={} and bookId={}", userId, bookId);
+        return mapToSwapResponses(
+            List.of(Swap.builder().requesterUserId(userId).responderUserId(userId).build()),
+            Map.of(),
+            "No requests found for user with this userId and bookId");
+      }
+
+      Set<String> bookIds = collectBookIds(swaps);
+      Map<String, BookResponseWithMedia> bookMap = makeBookMap(bookIds);
+      return mapToSwapResponses(swaps, bookMap, "Book found successfully");
+
+    } catch (Exception e) {
+      log.error(
+          "Error occurred while fetching requests for userId={} and bookId={} with error={}",
+          userId,
+          bookId,
+          e.getMessage());
+      return mapToSwapResponses(
+          List.of(Swap.builder().requesterUserId(userId).responderUserId(userId).build()),
+          Map.of(),
+          "Error occurred while processing the request");
+    }
+  }
+
   @Transactional
   public SwapResponse createSwapRequest(CreateSwapDTO dto) {
     log.info("Initiating creation of swap request for createSwapDTO={}", dto);
@@ -129,6 +202,63 @@ public class SwapService {
       if (swap != null) {
         deleteSwapBestEffort(swap);
       }
+      throw e;
+    }
+  }
+
+  @Transactional
+  public SwapResponse cancelSwapRequest(CancelSwapDTO cancelSwapDTO) {
+    log.info(
+        "Initiating cancel for swapId={} by user={}",
+        cancelSwapDTO.getSwapId(),
+        cancelSwapDTO.getRequesterUserId());
+
+    Swap swap =
+        swapRepository
+            .findBySwapIdForUpdate(cancelSwapDTO.getSwapId())
+            .orElseThrow(() -> new IllegalArgumentException("Swap not found"));
+
+    // State guard: only allow cancel when PENDING
+    if (swap.getSwapStatus() != SwapStatus.PENDING) {
+      throw new IllegalStateException("Only PENDING swaps can be cancelled");
+    }
+
+    // Only requester can cancel
+    if (cancelSwapDTO.getRequesterUserId() != null
+        && !Objects.equals(swap.getRequesterUserId(), cancelSwapDTO.getRequesterUserId())) {
+      throw new IllegalStateException("Only the requester can cancel this swap");
+    }
+
+    try {
+      // Best-effort release wallet (idempotent on Wallet side by (userId, swapId))
+      releaseWallet(
+          swap.getRequesterUserId(),
+          swap.getSwapId(),
+          swap.getRequesterBookId(),
+          swap.getRequesterBookPrice());
+
+      // Best-effort unreserve the requester's book (Catalog should be idempotent)
+      unreserveCatalog(swap.getRequesterBookId());
+
+      // Hard delete the swap row
+      deleteSwapBestEffort(swap);
+
+      // Notify others
+      publishSwapCancelledEvent(swap);
+
+      // Return a “deleted” style response (mirrors your failureResponseAfterDelete)
+      return SwapResponse.builder()
+          .swapId(swap.getSwapId())
+          .requesterUserId(swap.getRequesterUserId())
+          .responderUserId(swap.getResponderUserId())
+          .requesterBookId(swap.getRequesterBookId())
+          .responderBookId(swap.getResponderBookId())
+          .swapStatus(null)
+          .message("Swap cancelled and deleted successfully.")
+          .build();
+
+    } catch (Exception e) {
+      log.error("Error cancelling swapId={} err={}", cancelSwapDTO.getSwapId(), e.toString());
       throw e;
     }
   }
@@ -245,6 +375,20 @@ public class SwapService {
 
     outboxService.enqueueEvent(
         AggregateType.SWAP, responderBook.getOwnerUserId(), "SWAP_CREATED", evt);
+  }
+
+  private void publishSwapCancelledEvent(Swap swap) {
+    SwapCancelEvent evt =
+        SwapCancelEvent.builder()
+            .swapId(swap.getSwapId())
+            .requesterUserId(swap.getRequesterUserId())
+            .requesterBookId(swap.getRequesterBookId())
+            .responderUserId(swap.getResponderUserId())
+            .responderBookId(swap.getResponderBookId())
+            .build();
+
+    outboxService.enqueueEvent(
+        AggregateType.SWAP, swap.getResponderUserId(), "SWAP_CANCELLED", evt);
   }
 
   private SwapResponse buildSuccessResponse(

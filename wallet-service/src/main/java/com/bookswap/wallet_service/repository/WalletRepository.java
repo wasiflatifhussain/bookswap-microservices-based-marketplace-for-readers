@@ -14,6 +14,6 @@ public interface WalletRepository extends JpaRepository<Wallet, String> {
 
   // PESSIMISTIC WRITE LOCK: for operations that modify the wallet
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("select w from Wallet w where w.userId = :userId")
+  @Query("SELECT w FROM Wallet w WHERE w.userId = :userId")
   Optional<Wallet> findByUserIdForUpdate(@Param("userId") String userId);
 }
