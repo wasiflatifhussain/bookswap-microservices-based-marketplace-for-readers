@@ -37,10 +37,17 @@ public class WalletController {
     return ResponseEntity.ok(walletService.releaseUserBalance(userId, walletMutationRequest));
   }
 
-  @PostMapping("/{userId}/confirm")
-  public ResponseEntity<WalletMutationResponse> confirmSwapSuccess(
+  @PostMapping("/{userId}/requester/confirm")
+  public ResponseEntity<WalletMutationResponse> confirmSwapSuccessForRequester(
       @PathVariable String userId,
       @Valid @RequestBody WalletMutationRequest walletMutationRequest) {
-    return ResponseEntity.ok(walletService.confirmSwapSuccess(userId, walletMutationRequest));
+    return ResponseEntity.ok(walletService.confirmSwapSuccessForRequester(userId, walletMutationRequest));
+  }
+
+  @PostMapping("/{userId}/responder/confirm")
+  public ResponseEntity<WalletMutationResponse> confirmSwapSuccessForResponder(
+          @PathVariable String userId,
+          @Valid @RequestBody WalletMutationRequest walletMutationRequest) {
+    return ResponseEntity.ok(walletService.confirmSwapSuccessForResponder(userId, walletMutationRequest));
   }
 }

@@ -1,10 +1,13 @@
 package com.bookswap.catalog_service.controller;
 
+import com.bookswap.catalog_service.dto.request.BookIdList;
 import com.bookswap.catalog_service.dto.request.BookRequest;
 import com.bookswap.catalog_service.dto.response.BookDetailedResponse;
+import com.bookswap.catalog_service.dto.response.BookResponseWithMedia;
 import com.bookswap.catalog_service.dto.response.BookSimpleResponse;
 import com.bookswap.catalog_service.service.BookService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -53,5 +56,26 @@ public class BookController {
       @RequestParam("book-id") String bookId,
       @RequestParam(defaultValue = "0.15") double tolerance) {
     return ResponseEntity.ok(bookService.getMatchingBooks(bookId, tolerance));
+  }
+
+  @PostMapping("/books/bulk")
+  public ResponseEntity<List<BookResponseWithMedia>> getBooksByBulkBookIdOrder(
+      @RequestBody BookIdList bookIdList) {
+    return ResponseEntity.ok(bookService.getBooksByBulkBookIdOrder(bookIdList));
+  }
+
+  @PostMapping("/books/{bookId}/reserve")
+  public ResponseEntity<Boolean> reserveBookForSwap(@PathVariable String bookId) {
+    return ResponseEntity.ok(bookService.reserveBookForSwap(bookId));
+  }
+
+  @PostMapping("/books/{bookId}/unreserve")
+  public ResponseEntity<Boolean> unreserveBookForSwap(@PathVariable String bookId) {
+    return ResponseEntity.ok(bookService.unreserveBookForSwap(bookId));
+  }
+
+  @PostMapping("/books/confirm/swap")
+  public ResponseEntity<Boolean> confirmSwap(@RequestParam String requesterBookId, @RequestParam String responderBookId) {
+    return ResponseEntity.ok(bookService.confirmSwap(requesterBookId, responderBookId));
   }
 }

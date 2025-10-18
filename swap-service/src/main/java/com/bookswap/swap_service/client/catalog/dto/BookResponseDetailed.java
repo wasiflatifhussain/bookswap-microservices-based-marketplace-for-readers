@@ -1,8 +1,5 @@
-package com.bookswap.catalog_service.dto.response;
+package com.bookswap.swap_service.client.catalog.dto;
 
-import com.bookswap.catalog_service.domain.book.BookCondition;
-import com.bookswap.catalog_service.domain.book.BookGenre;
-import com.bookswap.catalog_service.domain.book.BookStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -14,24 +11,24 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class BookDetailedResponse {
+public class BookResponseDetailed {
   private String bookId;
 
   private String title;
   private String description;
 
-  private BookGenre genre;
+  private String genre;
 
   private String author;
 
-  private BookCondition bookCondition;
+  private String bookCondition;
 
   private Float valuation;
 
-  private BookStatus bookStatus;
+  private String bookStatus;
 
   private List<String> mediaIds;
-  private String ownerUserId; // NOTE: store Keycloak ID for users
+  private String ownerUserId;
 
   private LocalDateTime createdAt;
 
