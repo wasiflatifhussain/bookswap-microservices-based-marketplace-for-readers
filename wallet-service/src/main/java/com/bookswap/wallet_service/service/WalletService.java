@@ -316,23 +316,23 @@ public class WalletService {
   }
 
   @Transactional
-  public WalletMutationResponse confirmSwapSuccess(
-      String userId, @Valid WalletMutationRequest walletMutationRequest) {
-    log.info("Initiating swap confirmation for userId={}", userId);
+  public WalletMutationResponse confirmSwapSuccessForRequester(
+      String requesterUserId, @Valid WalletMutationRequest walletMutationRequest) {
+    log.info("Initiating swap confirmation for requesterUserId={}", requesterUserId);
 
     try {
       Optional<WalletReservation> walletReservationOptional =
           walletReservationRepository.findByUserIdAndBookId(
-              userId, walletMutationRequest.getBookId());
+              requesterUserId, walletMutationRequest.getBookId());
 
       if (walletReservationOptional.isEmpty()) {
         log.info(
-            "No book entry exist for bookId={} and userId={}",
+            "No book entry exist for bookId={} and requesterUserId={}",
             walletMutationRequest.getBookId(),
-            userId);
+            requesterUserId);
 
         return mapToWalletMutationResponse(
-            userId,
+            requesterUserId,
             walletMutationRequest.getBookId(),
             walletMutationRequest.getSwapId(),
             walletMutationRequest.getAmount(),
@@ -341,22 +341,23 @@ public class WalletService {
             0F,
             "No book entry exist for bookId="
                 + walletMutationRequest.getBookId()
-                + " userId="
-                + userId);
+                + " requesterUserId="
+                + requesterUserId);
       }
 
-      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(userId);
+      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(requesterUserId);
       if (walletOptional.isEmpty()) {
-        log.info("No books or available amount exist for user with userId={}", userId);
+        log.info(
+            "No books or available amount exist for user with requesterUserId={}", requesterUserId);
         return mapToWalletMutationResponse(
-            userId,
+            requesterUserId,
             walletMutationRequest.getBookId(),
             walletMutationRequest.getSwapId(),
             walletMutationRequest.getAmount(),
             walletMutationRequest.getMutationType(),
             0F,
             0F,
-            "No books or available amount exist for user with userId=" + userId);
+            "No books or available amount exist for user with requesterUserId=" + requesterUserId);
       }
 
       WalletReservation walletReservation = walletReservationOptional.get();
@@ -379,12 +380,12 @@ public class WalletService {
       walletReservationRepository.delete(walletReservation);
 
       log.info(
-          "Successfully confirmed swap and deducted reserved amount for user with userId={} and current availableAmount={} and reservedAmount={}",
-          userId,
+          "Successfully confirmed swap and deducted reserved amount for user with requesterUserId={} and current availableAmount={} and reservedAmount={}",
+          requesterUserId,
           wallet.getAvailableAmount(),
           wallet.getReservedAmount());
       return mapToWalletMutationResponse(
-          userId,
+          requesterUserId,
           walletMutationRequest.getBookId(),
           walletMutationRequest.getSwapId(),
           walletMutationRequest.getAmount(),
@@ -394,8 +395,65 @@ public class WalletService {
           "Swap confirmed and reserved amount deducted successfully");
     } catch (Exception e) {
       log.info(
-          "Failed to confirm swap for wallet for userId={} with error e={}",
-          userId,
+          "Failed to confirm swap for wallet for requesterUserId={} with error e={}",
+          requesterUserId,
+          e.getMessage(),
+          e);
+      throw e;
+    }
+  }
+
+  @Transactional
+  public WalletMutationResponse confirmSwapSuccessForResponder(
+      String responderUserId, @Valid WalletMutationRequest walletMutationRequest) {
+    log.info("Initiating swap confirmation for responderUserId={}", responderUserId);
+
+    try {
+
+      Optional<Wallet> walletOptional = walletRepository.findByUserIdForUpdate(responderUserId);
+      if (walletOptional.isEmpty()) {
+        log.info(
+            "No books or available amount exist for user with responderUserId={}", responderUserId);
+        return mapToWalletMutationResponse(
+            responderUserId,
+            walletMutationRequest.getBookId(),
+            walletMutationRequest.getSwapId(),
+            walletMutationRequest.getAmount(),
+            walletMutationRequest.getMutationType(),
+            0F,
+            0F,
+            "No books or available amount exist for user with responderUserId=" + responderUserId);
+      }
+
+      Wallet wallet = walletOptional.get();
+
+      if (wallet.getReservedAmount() == null) wallet.setReservedAmount(0F);
+
+      float newAvailableAmount = wallet.getAvailableAmount() - walletMutationRequest.getAmount();
+      if (newAvailableAmount < 0F) {
+        newAvailableAmount = 0F;
+      }
+
+      wallet.setAvailableAmount(newAvailableAmount);
+
+      log.info(
+          "Successfully confirmed swap and deducted available amount for user with responderUserId={} and current availableAmount={} and reservedAmount={}",
+          responderUserId,
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount());
+      return mapToWalletMutationResponse(
+          responderUserId,
+          walletMutationRequest.getBookId(),
+          walletMutationRequest.getSwapId(),
+          walletMutationRequest.getAmount(),
+          walletMutationRequest.getMutationType(),
+          wallet.getAvailableAmount(),
+          wallet.getReservedAmount(),
+          "Swap confirmed and reserved amount deducted successfully");
+    } catch (Exception e) {
+      log.info(
+          "Failed to confirm swap for wallet for responderUserId={} with error e={}",
+          responderUserId,
           e.getMessage(),
           e);
       throw e;

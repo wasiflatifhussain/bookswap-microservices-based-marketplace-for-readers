@@ -172,4 +172,49 @@ public class CatalogServiceClient {
         .doOnError(
             e -> log.error("Unreserve book failed for bookId={}, error={}", bookId, e.toString()));
   }
+
+  public Mono<Boolean> confirmSwap(String requesterBookId, String responderBookId) {
+    // sends request tp /books/{bookId}/swap
+    log.info(
+        "Starting book status change from Catalog-Service for requesterBookId={} and responderBookId={}",
+        requesterBookId,
+        responderBookId);
+
+    return catalogServiceWebClient
+        .post()
+        .uri(
+            uriBuilder ->
+                uriBuilder
+                    .path("/books/confirm/swap")
+                    .queryParam("requesterBookId", requesterBookId)
+                    .queryParam("responderBookId", responderBookId)
+                    .build())
+        .retrieve()
+        .onStatus(
+            HttpStatusCode::is4xxClientError,
+            resp ->
+                resp.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .doOnNext(
+                        body -> log.warn("Catalog 4xx status={}, body={}", resp.statusCode(), body))
+                    .then(Mono.error(new IllegalStateException("Catalog 4xx"))))
+        .onStatus(
+            HttpStatusCode::is5xxServerError,
+            resp ->
+                resp.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .doOnNext(
+                        body ->
+                            log.error("Catalog 5xx status={}, body={}", resp.statusCode(), body))
+                    .then(Mono.error(new IllegalStateException("Catalog 5xx"))))
+        .bodyToMono(Boolean.class)
+        .timeout(Duration.ofSeconds(10)) // throw TimeoutException if doesn't finish by 15 sec
+        .doOnError(
+            e ->
+                log.error(
+                    "Status change for book failed for requesterBookId={} and responderBookId={}, error={}",
+                    requesterBookId,
+                    responderBookId,
+                    e.toString()));
+  }
 }

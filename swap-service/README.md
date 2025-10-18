@@ -93,12 +93,13 @@ confirming, and releasing the virtual currency linked to each swap.
 
 - Called when a user proposes a swap
 - Implementation sequence:
-    1. Validates both books through the Catalog Service (GET book A and book B)
-        - Ensures that both books are "AVAILABLE"
-    2. Calls Catalog Service to reserve the requester's book (Book A)
-    3. Uses the returned book data to build a WalletMutationRequest and calls Wallet Service /reserve
-    4. Stores the swap record in its own database with status PENDING
-    5. Publishes a SWAP_CREATED event to Kafka for the Notification Service to consume
+    1. Fetch and validate both books through the Catalog Service (GET book A and book B) and ensure they are AVAILABLE.
+    2. Call Catalog Service to reserve the requester's book (Book A).
+    3. Persist the swap row in the Swap DB with status PENDING (snapshot pricing is stored).
+    4. Call Wallet Service to reserve the requester's funds using the saved swapId (idempotent by userId+swapId).
+        - If the Wallet reservation fails, the service performs best-effort rollback: unreserve the Catalog reservation
+          and delete the swap row.
+    5. Publish a `SWAP_CREATED` event to Kafka (outbox) for downstream notification processing.
 
 **Transaction Handling**: While the local database operations are protected by `@Transactional`, external API calls are
 not covered by this mechanism. If any external API call fails during the create swap process, the service performs
@@ -107,32 +108,56 @@ microservices even when some operations fail.
 
 ### 2. Accept Swap
 
-- Triggered by the responder when they accept an offer
-- Implementation sequence:
-    1. Calls Catalog Service /books/trade to mark both books as SWAPPED
-        - Catalog Service then publishes to Kafka so the Email Service can notify both users
-    2. Calls Wallet Service /confirm for both users to finalize the fund transfer
-    3. Publishes SWAP_ACCEPTED and SWAP_COMPLETED events to Kafka for notifications
-    4. Rejects all other pending swaps for the same responder_book_id:
-        - Calls Wallet Service /release for each rejected requester
-        - Calls Catalog Service to change those requester books back to AVAILABLE
-        - Publishes SWAP_REJECTED events to Kafka for Notification Service
+- Triggered by the responder when they accept an offer.
+- Implementation sequence (reflects actual code in `SwapService.acceptSwapRequest`):
+    1. Acquire a DB lock on the swap row using a `FOR UPDATE` read (`findBySwapIdForUpdate`) to prevent concurrent
+       modifications.
+    2. Verify the request's `responderUserId` matches the swap row; reject otherwise.
+    3. Call Catalog Service to confirm the trade (`confirmSwap(requesterBookId, responderBookId)`) and block up to 10s
+       for a Boolean response. Failure to confirm causes the operation to abort.
+    4. Call Wallet Service to confirm the previously reserved amounts for both users:
+        - Confirm for the requester via `confirmSwapSuccessForRequester(...)`
+        - Confirm for the responder via `confirmSwapSuccessForResponder(...)`
+        - Each call is blocked up to 10s and validated by checking the returned message contains `"confirmed"` (
+          case-insensitive).
+          Failures abort the operation.
+    5. Cancel all other pending swaps that target the same responder book:
+        - For each pending swap, call Wallet Service `release` for the requester (idempotent by `(userId, swapId)`),
+          call Catalog Service to unreserve the requester book (set back to AVAILABLE), delete the swap row, and publish
+          a cancellation event for notifications.
+    6. Delete the accepted swap row from the Swap DB (the service deletes the row instead of updating it to
+       ACCEPTED/COMPLETED).
+    7. Publish a `SWAP_COMPLETED` (outbox) event so downstream notification/email services can notify both parties.
+
+- Transactional and error handling notes:
+    - The method is annotated with `@Transactional` for local DB operations, and the service uses pessimistic locking
+      for safety.
+    - External calls (Catalog / Wallet) are not covered by the DB transaction. The implementation performs best-effort
+      and explicit checks; failures throw exceptions and are propagated.
+    - Timeouts used in code: Catalog and Wallet confirmation calls block with a 10-second timeout.
+    - Wallet and Catalog operations are assumed idempotent; Wallet operations are idempotent by `(userId, swapId)` per
+      service contract.
+    - The service relies on outbox events for reliable notification publishing after the DB changes.
 
 ### 3. Reject Swap
 
 - Triggered by the responder to decline an offer
 - Implementation sequence:
-    1. Calls Wallet Service /release to free the requester's reserved funds
+    1. Calls Wallet Service `/release` to free the requester's reserved funds
     2. Calls Catalog Service to set the requester's book back to AVAILABLE
-    3. Publishes SWAP_REJECTED to Kafka for Notification Service
+    3. Publishes `SWAP_REJECTED` to Kafka for Notification Service
 
 ### 4. Cancel Swap
 
 - Triggered by the requester to withdraw a pending offer
-- Implementation sequence:
-    1. Calls Catalog Service to set their book back to AVAILABLE
-    2. Calls Wallet Service /release to restore the reserved balance
-    3. Publishes SWAP_CANCELED to Kafka for Notification Service
+- Implementation sequence (matches actual implementation):
+    1. Acquire a DB lock on the swap row using `findBySwapIdForUpdate` to ensure no concurrent modifications.
+    2. State guard: only allow cancel when swap status is `PENDING`.
+    3. If a requesterUserId is provided in the request, validate it matches the swap row; only the requester may cancel.
+    4. Call Catalog Service to set their book back to AVAILABLE (best-effort, idempotent).
+    5. Call Wallet Service `/release` to restore the reserved balance (best-effort, idempotent by userId+swapId).
+    6. Delete the swap row from the DB (hard delete) and publish a `SWAP_CANCELED` event to Kafka (outbox) for
+       notifications.
 
 ---
 
@@ -150,10 +175,21 @@ To allow Swap to read or write to other services:
 2. Under Service Account Roles, grant the service-service-comms client the required roles:
     - `catalog.read` for read access
     - `catalog.write` for write access
-    - (and similarly for `wallet.read` / `wallet.write` when connecting to Wallet)
+    - (and similarly for `wallet.read` / `wallet.write` / `wallet.delete` when connecting to Wallet)
 3. On the service-service-comms client, create an Audience mapper and include the target client (e.g. bookswap-api) so
    that it appears under the `aud` claim in the token
 4. Keep "Add to access token" and "Add to token introspection" enabled
 
 Once this setup is done, Swap can securely communicate with other microservices without manual token passing or role
 checks in code — permissions are handled entirely through Keycloak service roles and audience configuration.
+
+## VIP Improvements needed in the future:
+
+- P1 Incident: We require rollbacks in service layer. As we are calling multiple external services, if any of them fail,
+  we need to rollback the previous successful calls. Current use of @Transactional only covers local DB operations. We
+  need to either implement a saga pattern with Kafka or retry mechanisms with idempotency keys. The main idea is that if
+  any
+  step fails, we can revert the previous steps to maintain data consistency across services.
+- P2 Incident: Another issue: In some places we throw errors while in others we return messages. We should standardize
+  this to always throw exceptions for error handling, which can then be caught and processed by a global exception
+  handler to return consistent error responses to clients. THIS NEEDS TO EXTEND TO ALL MICROSERVICES.

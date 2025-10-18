@@ -63,13 +63,13 @@ public class WalletServiceClient {
   }
 
   public Mono<WalletMutationResponse> releaseReservedInRequestWallet(
-      String userId, WalletMutationRequest build) {
+      String userId, WalletMutationRequest walletMutationRequest) {
     log.info("Starting release call to Wallet-Service for userId={}", userId);
 
     return walletServiceWebClient
         .post()
         .uri("/{userId}/release", userId)
-        .bodyValue(build)
+        .bodyValue(walletMutationRequest)
         .exchangeToMono(
             resp -> {
               if (resp.statusCode().is2xxSuccessful()) {
@@ -102,5 +102,91 @@ public class WalletServiceClient {
             })
         .timeout(Duration.ofSeconds(10))
         .doOnError(e -> log.error("Failed releasing funds with error={}", e.toString()));
+  }
+
+  public Mono<WalletMutationResponse> confirmSwapSuccessForRequester(
+      String userId, WalletMutationRequest walletMutationRequest) {
+    log.info("Starting swap confirmation call to Wallet-Service for requesterUserId={}", userId);
+
+    return walletServiceWebClient
+        .post()
+        .uri("/{userId}/requester/confirm", userId)
+        .bodyValue(walletMutationRequest)
+        .exchangeToMono(
+            resp -> {
+              if (resp.statusCode().is2xxSuccessful()) {
+                return resp.bodyToMono(new ParameterizedTypeReference<WalletMutationResponse>() {});
+              } else if (resp.statusCode().is4xxClientError()) {
+                return resp.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .flatMap(
+                        body -> {
+                          log.warn(
+                              "Wallet-Service 4xx with status={}, body={}",
+                              resp.statusCode(),
+                              body);
+                          return Mono.error(new IllegalArgumentException("Wallet 4xx: " + body));
+                        });
+              } else if (resp.statusCode().is5xxServerError()) {
+                return resp.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .flatMap(
+                        body -> {
+                          log.error(
+                              "Wallet-Service 5xx with status={}, body={}",
+                              resp.statusCode(),
+                              body);
+                          return Mono.error(new IllegalStateException("Wallet-Service error"));
+                        });
+              }
+              return Mono.error(
+                  new IllegalStateException("Unexpected HTTP status: " + resp.statusCode()));
+            })
+        .timeout(Duration.ofSeconds(10))
+        .doOnError(
+            e -> log.error("Failed confirming swap for requester with error={}", e.toString()));
+  }
+
+  public Mono<WalletMutationResponse> confirmSwapSuccessForResponder(
+      String userId, WalletMutationRequest walletMutationRequest) {
+    log.info("Starting swap confirmation call to Wallet-Service for responderUserId={}", userId);
+
+    return walletServiceWebClient
+        .post()
+        .uri("/{userId}/responder/confirm", userId)
+        .bodyValue(walletMutationRequest)
+        .exchangeToMono(
+            resp -> {
+              if (resp.statusCode().is2xxSuccessful()) {
+                return resp.bodyToMono(new ParameterizedTypeReference<WalletMutationResponse>() {});
+              } else if (resp.statusCode().is4xxClientError()) {
+                return resp.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .flatMap(
+                        body -> {
+                          log.warn(
+                              "Wallet-Service 4xx with status={}, body={}",
+                              resp.statusCode(),
+                              body);
+                          return Mono.error(new IllegalArgumentException("Wallet 4xx: " + body));
+                        });
+              } else if (resp.statusCode().is5xxServerError()) {
+                return resp.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .flatMap(
+                        body -> {
+                          log.error(
+                              "Wallet-Service 5xx with status={}, body={}",
+                              resp.statusCode(),
+                              body);
+                          return Mono.error(new IllegalStateException("Wallet-Service error"));
+                        });
+              }
+              return Mono.error(
+                  new IllegalStateException("Unexpected HTTP status: " + resp.statusCode()));
+            })
+        .timeout(Duration.ofSeconds(10))
+        .doOnError(
+            e -> log.error("Failed confirming swap for responder with error={}", e.toString()));
   }
 }

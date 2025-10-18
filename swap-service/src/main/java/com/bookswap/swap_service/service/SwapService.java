@@ -8,10 +8,12 @@ import com.bookswap.swap_service.client.wallet.WalletServiceClient;
 import com.bookswap.swap_service.client.wallet.dto.WalletMutationRequest;
 import com.bookswap.swap_service.client.wallet.dto.WalletMutationResponse;
 import com.bookswap.swap_service.domain.event.SwapCancelEvent;
+import com.bookswap.swap_service.domain.event.SwapCompletedEvent;
 import com.bookswap.swap_service.domain.event.SwapCreatedEvent;
 import com.bookswap.swap_service.domain.outbox.AggregateType;
 import com.bookswap.swap_service.domain.swap.Swap;
 import com.bookswap.swap_service.domain.swap.SwapStatus;
+import com.bookswap.swap_service.dto.request.AcceptSwapDTO;
 import com.bookswap.swap_service.dto.request.CancelSwapDTO;
 import com.bookswap.swap_service.dto.request.CreateSwapDTO;
 import com.bookswap.swap_service.dto.response.SwapResponse;
@@ -146,6 +148,18 @@ public class SwapService {
     }
   }
 
+  /**
+   * Create a swap request.
+   *
+   * <p>Implementation (overview): 1) Fetch & validate both books from Catalog (must be AVAILABLE).
+   * 2) Reserve the requester's book in Catalog. 3) Persist the swap row (PENDING snapshot). 4)
+   * Reserve requester funds in Wallet (idempotent by userId+swapId). On wallet failure, unreserve
+   * catalog and delete the swap row (best-effort rollback). 5) Publish SWAP_CREATED event to the
+   * outbox.
+   *
+   * <p>This method is transactional for local DB operations; external calls are compensated
+   * explicitly on error.
+   */
   @Transactional
   public SwapResponse createSwapRequest(CreateSwapDTO dto) {
     log.info("Initiating creation of swap request for createSwapDTO={}", dto);
@@ -206,6 +220,14 @@ public class SwapService {
     }
   }
 
+  /**
+   * Cancel a pending swap request.
+   *
+   * <p>Implementation (overview): 1) Lock the swap row (FOR UPDATE) and validate state (PENDING)
+   * and requester identity (if provided). 2) Release wallet reservation (best-effort, idempotent)
+   * and unreserve the requester book in Catalog. 3) Delete the swap row and publish a SWAP_CANCELED
+   * event.
+   */
   @Transactional
   public SwapResponse cancelSwapRequest(CancelSwapDTO cancelSwapDTO) {
     log.info(
@@ -260,6 +282,147 @@ public class SwapService {
     } catch (Exception e) {
       log.error("Error cancelling swapId={} err={}", cancelSwapDTO.getSwapId(), e.toString());
       throw e;
+    }
+  }
+
+  /**
+   * Accepts a pending swap.
+   *
+   * <p>Sequence (matches implementation): 1. Lock the swap row with a FOR UPDATE read to prevent
+   * concurrent modifications. 2. Validate the responderUserId matches the swap. 3. Call Catalog
+   * Service to confirm the trade (blocks up to 10s). 4. Confirm reserved funds with Wallet Service
+   * for both requester and responder (each call blocks up to 10s and is validated by checking the
+   * returned message contains "confirmed"). 5. Cancel all other pending requests for the responder
+   * book: release requester wallet reservations, unreserve requester books in Catalog, delete those
+   * swap rows, and publish cancellation events. 6. Delete the accepted swap row and enqueue a
+   * SWAP_COMPLETED event to the outbox for notifications.
+   *
+   * <p>Notes: - External calls are not covered by the DB transaction; failures result in exceptions
+   * and rely on best-effort compensations / idempotency of downstream services. - The method
+   * deletes the swap row on completion rather than persisting an ACCEPTED/COMPLETED state.
+   */
+  @Transactional
+  public SwapResponse acceptSwapRequest(AcceptSwapDTO acceptSwapDTO) {
+    log.info(
+        "Initiating accept for swapId={} by user={}",
+        acceptSwapDTO.getSwapId(),
+        acceptSwapDTO.getResponderUserId());
+
+    try {
+      Optional<Swap> swapOptional = swapRepository.findBySwapIdForUpdate(acceptSwapDTO.getSwapId());
+      if (swapOptional.isEmpty()) {
+        log.error("No swap object found with swapId={}", acceptSwapDTO.getSwapId());
+        return SwapResponse.builder()
+            .message("No swap object found with swapId=" + acceptSwapDTO.getSwapId())
+            .build();
+      }
+
+      Swap swap = swapOptional.get();
+
+      if (!Objects.equals(swap.getResponderUserId(), acceptSwapDTO.getResponderUserId())) {
+        log.error(
+            "Mismatch between swap responderUserId={} and request's responderUserId={}",
+            swap.getResponderUserId(),
+            acceptSwapDTO.getResponderUserId());
+        return SwapResponse.builder()
+            .message("Mismatch between swap responderUserId and request's responderUserId")
+            .build();
+      }
+
+      Boolean catalogConfirmation =
+          catalogServiceClient
+              .confirmSwap(swap.getRequesterBookId(), swap.getResponderBookId())
+              .block(Duration.ofSeconds(10));
+      if (catalogConfirmation == null || !catalogConfirmation) {
+        throw new IllegalStateException("Catalog confirmSwap failed");
+      }
+
+      WalletMutationResponse forRequesterUser =
+          walletServiceClient
+              .confirmSwapSuccessForRequester(
+                  swap.getRequesterUserId(),
+                  WalletMutationRequest.builder()
+                      .bookId(swap.getRequesterBookId())
+                      .swapId(swap.getSwapId())
+                      .amount(swap.getRequesterBookPrice())
+                      .mutationType("CONFIRMED")
+                      .build())
+              .block(Duration.ofSeconds(10));
+      if (forRequesterUser == null
+          || forRequesterUser.getMessage() == null
+          || !forRequesterUser.getMessage().toLowerCase().contains("confirmed")) {
+        throw new IllegalStateException("Wallet confirm (requester) failed");
+      }
+
+      WalletMutationResponse forResponderUser =
+          walletServiceClient
+              .confirmSwapSuccessForResponder(
+                  swap.getResponderUserId(),
+                  WalletMutationRequest.builder()
+                      .bookId(swap.getResponderBookId())
+                      .swapId(swap.getSwapId())
+                      .amount(swap.getResponderBookPrice())
+                      .mutationType("CONFIRMED")
+                      .build())
+              .block(Duration.ofSeconds(10));
+      if (forResponderUser == null
+          || forResponderUser.getMessage() == null
+          || !forResponderUser.getMessage().toLowerCase().contains("confirmed")) {
+        throw new IllegalStateException("Wallet confirm (responder) failed");
+      }
+
+      // Delete all requests in Swap DB which have responderBook as their responderBook since
+      // responder book is no longer available
+      // This is not required to be done for requesterBook since the system changes requesterBook
+      // status to RESERVED upon request, preventing other's from sending request for this book
+
+      cancelOtherPendingRequestsForResponderBook(swap);
+
+      // Delete swapped book from Swap DB
+      swapRepository.delete(swap);
+
+      // Publish to email service so email serve gets the ids and send out emails to both parties
+      publishSwapConfirmedEvent(swap);
+
+      return SwapResponse.builder().message("Swap completed successfully.").build();
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  private void cancelOtherPendingRequestsForResponderBook(Swap swap) {
+    log.info(
+        "Initiating cancellation of other pending requests for responderBookId={}",
+        swap.getResponderBookId());
+
+    List<Swap> swapsToCancel =
+        swapRepository.findPendingByResponderBookIdExcludingSwapId(
+            swap.getResponderBookId(), swap.getSwapId());
+
+    for (Swap s : swapsToCancel) {
+      try {
+        // Best-effort release wallet (idempotent on Wallet side by (userId, swapId))
+        releaseWallet(
+            s.getRequesterUserId(),
+            s.getSwapId(),
+            s.getRequesterBookId(),
+            s.getRequesterBookPrice());
+
+        // Best-effort unreserve the requester's book (Catalog should be idempotent)
+        unreserveCatalog(s.getRequesterBookId());
+
+        // Hard delete the swap row
+        deleteSwapBestEffort(s);
+
+        // Notify others
+        publishSwapCancelledEvent(s);
+      } catch (Exception e) {
+        log.error(
+            "Error cancelling swapId={} for responderBookId={} err={}",
+            s.getSwapId(),
+            swap.getResponderBookId(),
+            e.toString());
+      }
     }
   }
 
@@ -389,6 +552,20 @@ public class SwapService {
 
     outboxService.enqueueEvent(
         AggregateType.SWAP, swap.getResponderUserId(), "SWAP_CANCELLED", evt);
+  }
+
+  private void publishSwapConfirmedEvent(Swap swap) {
+    SwapCompletedEvent evt =
+        SwapCompletedEvent.builder()
+            .swapId(swap.getSwapId())
+            .requesterUserId(swap.getRequesterUserId())
+            .requesterBookId(swap.getRequesterBookId())
+            .responderUserId(swap.getResponderUserId())
+            .responderBookId(swap.getResponderBookId())
+            .build();
+
+    outboxService.enqueueEvent(
+        AggregateType.SWAP, swap.getResponderUserId(), "SWAP_COMPLETED", evt);
   }
 
   private SwapResponse buildSuccessResponse(

@@ -359,6 +359,48 @@ public class BookService {
     }
   }
 
+  @Transactional
+  public Boolean confirmSwap(String requesterBookId, String responderBookId) {
+    log.info("Initializing confirm swap for requesterBookId={} and responderBookId={}", requesterBookId, responderBookId);
+
+    try {
+      Optional<Book> bookRequesterBookOpt = bookRepository.findByBookId(requesterBookId);
+      Optional<Book> bookResponderBookOpt = bookRepository.findByBookId(responderBookId);
+      if (bookResponderBookOpt.isEmpty() || bookRequesterBookOpt.isEmpty()) {
+        log.warn("Book not found for changing bookStatus for requesterBookId={} and responderBookId={}", requesterBookId, responderBookId);
+        return false;
+      }
+
+      Book requesterBook = bookRequesterBookOpt.get();
+      Book responderBook = bookResponderBookOpt.get();
+      if (requesterBook.getBookStatus() != BookStatus.RESERVED) {
+        log.warn(
+                "Book not reserved currently for changing status with requesterBookId={} and currentStatus={}",
+                requesterBookId,
+                requesterBook.getBookStatus());
+        return false;
+      }
+
+      if (responderBook.getBookStatus() != BookStatus.AVAILABLE) {
+        log.warn(
+                "Book not available currently for changing status with responderBookId={} and currentStatus={}",
+                responderBookId,
+                responderBook.getBookStatus());
+        return false;
+      }
+
+      requesterBook.setBookStatus(BookStatus.SWAPPED);
+      bookRepository.save(requesterBook);
+      responderBook.setBookStatus(BookStatus.SWAPPED);
+      bookRepository.save(responderBook);
+      log.info("Book status changed successfully for requesterBookId={} and responderBookId={}", requesterBookId, responderBookId);
+      return true;
+    } catch (Exception e) {
+      log.error("Error while changning book status with error=", e);
+      return false;
+    }
+  }
+
   private static <T> T firstOrNull(List<T> list) {
     return (list != null && !list.isEmpty()) ? list.get(0) : null;
   }

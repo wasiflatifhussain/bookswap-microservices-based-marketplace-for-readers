@@ -1,6 +1,7 @@
 package com.bookswap.swap_service.controller;
 
 import com.bookswap.swap_service.domain.swap.SwapStatus;
+import com.bookswap.swap_service.dto.request.AcceptSwapDTO;
 import com.bookswap.swap_service.dto.request.CancelSwapDTO;
 import com.bookswap.swap_service.dto.request.CreateSwapDTO;
 import com.bookswap.swap_service.dto.response.SwapResponse;
@@ -44,5 +45,10 @@ public class SwapController {
   @PostMapping("/requests/cancel")
   public ResponseEntity<SwapResponse> cancelSwapRequest(@RequestBody CancelSwapDTO cancelSwapDTO) {
     return ResponseEntity.ok(swapService.cancelSwapRequest(cancelSwapDTO));
+  }
+
+  @PostMapping("/requests/accept")
+  public ResponseEntity<SwapResponse> acceptSwapRequest(@RequestBody AcceptSwapDTO acceptSwapDTO) {
+    return ResponseEntity.ok(swapService.acceptSwapRequest(acceptSwapDTO));
   }
 }

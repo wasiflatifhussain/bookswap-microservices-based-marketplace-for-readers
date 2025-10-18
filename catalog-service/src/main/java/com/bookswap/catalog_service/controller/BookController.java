@@ -73,4 +73,9 @@ public class BookController {
   public ResponseEntity<Boolean> unreserveBookForSwap(@PathVariable String bookId) {
     return ResponseEntity.ok(bookService.unreserveBookForSwap(bookId));
   }
+
+  @PostMapping("/books/confirm/swap")
+  public ResponseEntity<Boolean> confirmSwap(@RequestParam String requesterBookId, @RequestParam String responderBookId) {
+    return ResponseEntity.ok(bookService.confirmSwap(requesterBookId, responderBookId));
+  }
 }

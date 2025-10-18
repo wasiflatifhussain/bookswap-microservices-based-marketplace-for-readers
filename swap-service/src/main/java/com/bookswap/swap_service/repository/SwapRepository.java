@@ -21,4 +21,14 @@ public interface SwapRepository extends JpaRepository<Swap, String> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT s FROM Swap s WHERE s.swapId = :swapId")
   Optional<Swap> findBySwapIdForUpdate(@Param("swapId") String swapId);
+
+  @Query(
+      """
+    SELECT s FROM Swap s
+    WHERE s.responderBookId = :responderBookId
+    AND s.swapStatus = 'PENDING'
+    AND s.swapId <> :excludeSwapId
+    """)
+  List<Swap> findPendingByResponderBookIdExcludingSwapId(
+      String responderBookId, String excludeSwapId);
 }
