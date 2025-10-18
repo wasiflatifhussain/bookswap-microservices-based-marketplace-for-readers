@@ -1,59 +1,3 @@
-```
-catalog-service/
-└── src/
-└── main/
-├── java/com/bookswap/catalog/
-│    ├── CatalogServiceApplication.java   # main entry
-│
-│    ├── config/                          # service-level configs
-│    │     ├── SecurityConfig.java
-│    │     ├── WebConfig.java
-│    │     └── OpenApiConfig.java
-│
-│    ├── controller/                      # REST controllers
-│    │     └── BookController.java
-│
-│    ├── dto/                             # request/response DTOs
-│    │     ├── request/
-│    │     │     ├── CreateBookRequest.java
-│    │     │     └── UpdateBookRequest.java
-│    │     └── response/
-│    │           └── BookResponse.java
-│
-│    ├── domain/                          # models & enums
-│    │     ├── Book.java
-│    │     ├── BookStatus.java
-│    │     └── Condition.java
-│
-│    ├── repository/                      # Spring Data JPA repositories
-│    │     └── BookRepository.java
-│
-│    ├── service/                         # business logic
-│    │     ├── BookService.java
-│    │     └── BookServiceImpl.java
-│
-│    ├── external/                     # external service clients
-│    │     ├── ValuationClient.java
-│    │     └── MediaClient.java
-│
-│    ├── events/                          # outbox + kafka publisher
-│    │     ├── BookEvent.java
-│    │     ├── OutboxEntity.java
-│    │     └── EventPublisher.java
-│
-│    ├── security/                        # auth checks, JWT utils
-│    │     └── AuthUtil.java
-│
-│    └── util/                            # helper classes (mappers, constants)
-│          └── BookMapper.java
-│
-└── resources/
-├── application.yml
-├── bootstrap.yml                    # for Config Server
-└── db/migration/
-└── V1__init.sql                # Flyway migration
-```
-
 # Catalog Service
 
 The Catalog Service manages book records, their metadata, and their state in the marketplace. It exposes REST endpoints
@@ -153,6 +97,51 @@ for CRUD operations and participates in the event-driven workflow via Kafka.
 - List most recent listed books for homepage feed.
 - **Auth:** Not required.
 - **Response:** List of book detail objects.
+
+---
+
+### GET /api/catalog/books/matches?book-id={id}&tolerance=0.15
+
+- Suggests books from others with similar valuation to book-id value.
+- **Auth:** Optional.
+- **Response:** List of book detail objects.
+
+---
+
+### POST /api/catalog/books/bulk
+
+- Bulk-fetch book details for a list of book IDs in the requested order.
+- **Auth:** OAuth2 Bearer Token required.
+- **Request Body:** `{"bookIds": ["id1","id2", ...]}`
+- **Response:** Ordered list of book objects with media references (used by other services to bulk-resolve books).
+
+---
+
+### POST /api/catalog/books/{bookId}/reserve
+
+- Reserve a book for a pending swap (mark it temporarily RESERVED so others cannot request it).
+- **Auth:** Service-to-service token (Swap Service).
+- **Behavior:** Sets the book's transient status to RESERVED; returns Boolean success.
+- **Use-case:** Called during swap creation to prevent concurrent requests for the same requester book.
+
+---
+
+### POST /api/catalog/books/{bookId}/unreserve
+
+- Unreserve a previously reserved book and make it AVAILABLE again.
+- **Auth:** Service-to-service token (Swap Service).
+- **Behavior:** Reverts reservation (idempotent) and returns Boolean success.
+- **Use-case:** Called when swap creation fails or a pending swap is cancelled.
+
+---
+
+### POST /api/catalog/books/confirm/swap
+
+- Confirm and finalize a swap between two books (Catalog.confirmSwap).
+- **Auth:** Service-to-service token (Swap Service).
+- **Parameters:** `requesterBookId` and `responderBookId` as request parameters.
+- **Behavior:** Performs the canonical ownership/state transition for both books (or unlists them) and returns a Boolean
+  indicating success. The endpoint is called by the Swap Service during accept with a 10s timeout expectation.
 
 ---
 

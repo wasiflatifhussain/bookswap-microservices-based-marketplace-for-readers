@@ -1,624 +1,260 @@
-# bookswap-microservices-based-marketplace-for-readers
+# BookSwap MarketPlace
 
-Welcome to **BookSwap** – a smart trade marketplace for readers to swap novels using the novelty currency **BookCoins**.
+Welcome to **BookSwap** – a microservices-based marketplace where readers trade books using BookCoins.
 
----
-
-## 📚 BookSwap – Feature Plan
-
-### 1. Browsing & Catalog
-
-- ✅ **Browse catalog:** Anyone (logged-in or not) can browse/search available books.
-- ✅ **Book detail view:** Shows title, author, photos, description, current BookCoin valuation, and owner.
-- ✅ **Filter/search:** By title, author, genre, valuation band, or condition _(optional for MVP)_.
-
-### 2. User & Registration
-
-- ✅ **User registration & login:** Required to own books or send swap requests.
-- ✅ **Profile page:** Shows owned books, active requests, and swap history.
-
-### 3. Book Registration
-
-- ✅ **Upload a book:** Add details (title, author, year, description, optional ISBN, notes).
-- ✅ **Upload photos:** Cover + condition photos (front, spine, pages).
-- ✅ **AI Valuation:**
-    - Condition detection (photos + metadata like “mint”, “signed”).
-    - Assigns BookCoins (band or exact value).
-- ✅ **Add to catalog:** Once valued, the book is visible in the universal catalog.
-
-### 4. Swap Requests
-
-- ✅ **Send swap request:** Offer BookCoins for someone else’s book.
-- ✅ **Notification:** Target user is notified (in-app + email).
-- ✅ **Accept/decline:** Target user can accept or reject.
-- ✅ **On accept:**
-    - Both users receive email with contact details.
-    - Both books are removed from the catalog.
-    - Any other pending swap requests involving those books are auto-deleted.
-
-### 5. BookCoins System
-
-- ✅ **Wallet:** Each user has a BookCoin balance.
-- ✅ **Earn:** When you list/register a book → you receive BookCoins equal to valuation _(optional: only after a
-  successful swap)_.
-- ✅ **Spend:** When you swap → you pay with BookCoins.
-- ✅ **Auto-updates:** Accepting/declining swaps updates BookCoin balances.
-
-### 6. Notifications & Updates
-
-- ✅ **In-app notifications:** For swap requests, acceptances, rejections.
-- ✅ **Email notifications:** On swap acceptance → exchange contact info.
-
-### Plan: Making the Microservices
-
-- Plan the methods to put inside each microservice
-- Where the microservice(s) stores their data
-- How to implement event-driven system for microservice interactions
+This repository contains several domain services (Catalog, Media, Valuation, Swap, Wallet, Notification, Email, and a
+BFF) plus infra connectors. Each service has its own README with endpoint and implementation details — this root README
+provides a concise overview of responsibilities, the important cross-service workflows, and a compact list of the main
+service endpoints with what they do.
 
 ---
 
-#### **Services Needed**
+## Project snapshot (short)
 
-##### **Connectors**
-
-- API Gateway Service
-- Eureka Server Service
-- Config Server Service
-- Auth/User Service
-
-##### **Domain Services**
-
-- Catalog Service
-- Media Service (for pics)
-- AI Valuation Service
-- Swap Service
-- Wallet Service
-- Notification Service
+- Goal: Build a reliable, event-driven market for swapping books with clear ownership, valuations, and a lightweight
+  BookCoin currency.
+- Architecture: Small, focused microservices; Kafka used for events; Outbox pattern for reliable publishing; REST for
+  point reads; WebSockets for real-time notifications.
 
 ---
 
-### **Catalog Service**
+## Services & responsibilities (summarized)
 
-_Owns: books (business states: `DRAFT → LISTED → UNLISTED (SWAPPED OWNER_ACTION)`)_
+- **Catalog Service** — owns book records and lifecycle (draft → listed → unlisted/swapped). Stores book metadata,
+  valuation snapshot, media refs, and owner info (including planned owner email field to support the Email Service).
 
-- **POST** `/api/catalog/books`  
-  Create a new book entry (state = DRAFT).  
-  _Emits:_ `book.created`  
-  _Returns:_ book object with `book_id`, `state`, `metadata`.
+- **Media Service** — handles image uploads (pre-signed S3 flows) and media metadata. Emits media-stored events consumed
+  by Catalog and Valuation.
 
-- **DELETE** `/api/catalog/books/{bookId}`  
-  Unlists a book (logical delete → UNLISTED).  
-  _Emits:_ `book.unlisted`  
-  _Returns:_ `{ book_id, state: "UNLISTED", reason }`
+- **Valuation Service** — computes BookCoin valuations (rule-based or ML) and publishes valuation-ready events; Catalog
+  consumes these to attach valuation snapshots. (Valuation currently implemented as a service layer worker — may not
+  expose many public controllers.)
 
-- **GET** `/api/catalog/books/{bookId}`  
-  Fetch one book (with media URLs + valuation if ready).  
-  _Returns:_ full book detail object.
+- **Swap Service** — manages swap proposals and the swap lifecycle (create, cancel, accept/confirm). Uses DB
+  transactions + pessimistic locking for swap rows, coordinates Catalog and Wallet for reservations and confirmations,
+  and publishes outbox events for downstream consumers.
 
-- **GET** `/api/catalog/books/user/{userId}`  
-  Fetch list of books (with media URLs + valuation if ready) for that userId.  
-  _Returns:_ full list of book detail objects.
+- **Wallet Service** — manages BookCoin balances, reservations, confirmations, releases, and settlements. Exposes
+  idempotent operations keyed by `(userId, swapId)`.
 
-- **GET** `/api/catalog/books/recent?limit=20`  
-  Most recent LISTED books for homepage feed.  
-  _Returns: List of book detail objects.
+- **Notification Service** — in-app notification hub: consumes swap/catalog events and pushes real-time messages over
+  WebSocket; keeps lightweight unread counts and short-lived notification records.
 
-- **GET** `/api/catalog/books/matches?book-id={id}&tolerance=0.15`  
-  Suggests books from others with similar valuation to book-id value.  
-  _Returns:_ List of book detail objects.
+- **Email Service (planned)** — persistent email store and outbound emails: subscribes to book-finalized events to
+  capture owner emails (Catalog model will include owner email), and to `SWAP_COMPLETED` events to send transactional
+  emails to involved parties.
 
----
-
-### **Swap Service**
-
-_Manages: All swap actions for the users_
-
-- **POST** `/swap/requests`  
-  Create a swap request for a target book.  
-  _Body:_ `{ target_book_id, offer_coins }`  
-  _Returns:_ swap object `{ swap_id, state: "PENDING", buyer_id, seller_id, target_book_id, offer_coins, created_at }`  
-  _Emits:_ `swap.created`
-
-- **POST** `/swap/requests/{swapId}/accept`  
-  Owner accepts request → triggers settlement via Wallet + unlist via Catalog.  
-  _Returns:_ `{ swap_id, state: "ACCEPTED" }`  
-  _Emits:_ `swap.accepted { swap_id, buyer_id, seller_id, coins, target_book_id }`
-
-- **POST** `/swap/requests/{swapId}/decline`  
-  Owner declines request.  
-  _Returns:_ `{ swap_id, state: "DECLINED" }`  
-  _Emits:_ `swap.declined`
-
-- **POST** `/swap/requests/{swapId}/cancel`  
-  Requester cancels a still-pending request.  
-  _Returns:_ `{ swap_id, state: "CANCELLED" }`  
-  _Emits:_ `swap.cancelled`
-
-- **GET** `/swap/requests/{swapId}`  
-  Get one swap request.  
-  _Returns:_ swap detail `{ swap_id, state, buyer_id, seller_id, target_book_id, offer_coins, created_at, updated_at }`
-
-- **GET** `/swap/requests?mine=true&role={buyer|seller}&state={PENDING|ACCEPTED|...}&limit=&cursor=`  
-  List my swaps (as buyer/seller), optionally by state.  
-  _Returns:_ `{ items: [...], next_cursor }`
+- **BFF (Backend-for-Frontend)** — a small composition layer that aggregates calls, simplifies complex client flows (
+  e.g., book creation + media + valuation polling), and provides optimized payloads for the frontend.
 
 ---
 
-### **Media Service**
+## Service Endpoints (high-level)
 
-#### Media Service Endpoints
+Below is a compact list of the primary endpoints for each microservice and what they do (no request/response shapes
+here — see each service README for full API contracts).
+
+### Catalog Service (key endpoints)
+
+- **POST /api/catalog/books**
+    - Create a new book entry in DRAFT state. Triggers an outbox event `BOOK_CREATED` for downstream services (
+      media/valuation).
+    - Requires authentication. The service persists a snapshot of metadata and owner info.
+
+- **GET /api/catalog/books/{bookId}**
+    - Retrieve full book details (metadata, media references, valuation snapshot, owner info).
+    - Used by frontend and other services to validate book state.
+
+- **POST /api/catalog/books/{bookId}/reserve** (or similar internal reserve endpoint)
+    - Mark a book as reserved (for a swap requester). Intended for coordination with Swap Service during create-swap
+      flow.
+    - Publishes or updates local state so other services see this temporary reservation.
+
+- **POST /api/catalog/books/{bookId}/unreserve**
+    - Revert a previous reservation (used when swap creation fails or is cancelled) and make the book AVAILABLE again.
+
+- **POST /api/catalog/books/confirm-swap** (Catalog.confirmSwap)
+    - Finalize ownership/state changes when a swap is accepted. The Swap Service calls this during accept flow and
+      expects a Boolean confirmation (timeout-protected).
+    - This endpoint is responsible for the canonical transfer (or unlisting) of involved book records.
+
+> Operational note: Catalog will include owner contact (email) in the model so the Email Service can persist owner
+> emails when books become finalized/listed.
+
+### Media Service (key endpoints)
 
 - **POST /api/media/uploads/{bookId}/init**
-    - Initializes one or more media uploads for a book.
-    - Requires OAuth2 authentication.
-    - Request body: list of files with name, mimeType, and sizeBytes.
-    - Returns presigned S3 URLs and metadata for each file.
-
-- **PUT presigned S3 URL**
-    - Upload the file directly to S3 using the provided presigned URL.
-    - Set the Content-Type header as specified in the response.
-    - Body is the binary image data.
+    - Initialize one or more media uploads and return pre-signed S3 URLs. Creates media records in PENDING state.
+    - Requires authentication and validates upload metadata (mimeType, size).
 
 - **POST /api/media/uploads/{bookId}/complete**
-    - Confirms the media upload for a specific book.
+    - Confirms the media upload for a specific book. Marks provided media IDs as STORED and publishes a `MEDIA_STORED`
+      event to Kafka so Catalog/Valuation can react.
     - Requires OAuth2 authentication.
-    - Marks the medias as STORED and publishes an event to Kafka for the Catalog service.
 
 - **GET /api/media/downloads/{bookId}/view**
-    - Retrieves presigned S3 URLs for all images associated with a book.
-    - Requires OAuth2 authentication.
-    - Returns a list of short-lived URLs for viewing images.
+    - Returns presigned URLs for viewing all stored media for a book (used by frontend to render images).
 
-- **Media Deletion**
-    - Media is deleted automatically when a book is deleted in the Catalog service.
-    - The Catalog service emits an event to Kafka, which the Media service listens for to remove media from S3 and the
-      database.
+### Valuation Service (key operations)
 
----
+- **(Trigger) POST /valuation/jobs** (optional)
+    - Request a valuation recompute for a book. The service layer computes BookCoin valuation either synchronously or as
+      a queued job and publishes `VALUATION_READY` when done.
+    - In most flows Valuation is triggered by domain events (e.g., `BOOK_MEDIA_FINALIZED`) rather than explicit
+      controller calls.
 
-### **Valuation Service**
+- **(Read) GET /valuation/books/{bookId}**
+    - Fetch the latest valuation snapshot for a book (coins, confidence, policy version).
 
-_Maintain valuation and conversion rate for BookCoin to Book Price and so on; Keep this in Valuation Service as a
-versioned policy._
+> Note: Valuation may primarily be a worker/service-layer consumer of events (no heavy public controller surface) — the
+> important detail is it emits `VALUATION_READY` for Catalog to persist a snapshot.
 
-- **POST** `/valuation/jobs`  
-  Trigger (or retrigger) valuation for a book.  
-  _Body:_ `{ book_id }` (service also auto-triggers on `book.created` / `media.uploaded`)  
-  _Returns:_ `{ job_id, book_id, status: "QUEUED" }`  
-  _Emits:_ none (job created only).
+### Swap Service (key endpoints)
 
-- **GET** `/valuation/books/{bookId}`  
-  Fetch current valuation result (if any).  
-  _Returns:_ Book valuation
+- **POST /swap/requests**
+    - Create a swap request for a target book. Coordinates with Catalog to validate/ reserve the requester book and with
+      Wallet to reserve requester funds (idempotent by userId+swapId). Persists a PENDING swap and enqueues a
+      `SWAP_CREATED` outbox event.
 
-- **POST** `/valuation/books/{bookId}/recompute`  
-  Force a fresh run (e.g., after better photos).  
-  _Returns:_ `{ job_id, book_id, status: "QUEUED" }`
+- **POST /swap/requests/{swapId}/accept**
+    - Accept an existing swap. This is the critical accept/confirm workflow (see the canonical workflow section above):
+      DB locking (FOR UPDATE), Catalog.confirmSwap, Wallet confirm calls for requester/responder, cancel other pending
+      swaps for responder book, delete accepted swap row, and publish `SWAP_COMPLETED` event via outbox.
 
-- **GET** `/valuation/jobs/{jobId}`  
-  Check job status.  
-  _Returns:_ `{ job_id, book_id, status: "QUEUED|RUNNING|SUCCEEDED|FAILED", error? }`
+- **POST /swap/requests/{swapId}/decline**
+    - Responder rejects the offer. Releases reservations: call Wallet `/release` for requester, unreserve Catalog for
+      requester book, delete swap row, and publish `SWAP_REJECTED`/`SWAP_CANCELLED` events for notifications.
 
----
+- **POST /swap/requests/{swapId}/cancel**
+    - Requester cancels their pending offer. Validates requester identity, releases wallet reservation, unreserves
+      Catalog, deletes swap row, and publishes cancellation event (idempotent-safe).
 
-### **Wallet Service**
+- **GET /swap/requests/{swapId}** and listing endpoints
+    - Read endpoints for UI: list sent/received requests and all requests for a book. These endpoints aggregate Catalog
+      book details (bulk calls) so the UI gets full book context.
 
-_Maintain a wallet with user's BookCoin balance. When user adds a new book to his catalog, or swaps a book, the wallet
-valuation is adjusted._
+### Wallet Service (key endpoints)
 
-- **GET** `/wallet/me`  
-  Get my current BookCoin balance.  
-  _Returns:_ `{ user_id, available_coins, pending_coins, updated_at }`
+- **POST /api/wallet/{userId}/reserve**
+    - Reserve funds for a swap (include swapId/bookId/amount). Idempotent by `(userId, swapId)`.
 
-- **GET** `/wallet/ledger?limit=&cursor=`  
-  List my wallet transactions.  
-  _Returns:_ `{ items: [{ ledger_id, delta_coins, balance_after, ref_type, ref_id, created_at }], next_cursor }`
+- **POST /api/wallet/{userId}/confirm**
+    - Confirm a previously reserved amount (used when swap accept is in progress).
 
-- **POST** `/wallet/transfer` (admin/test only)  
-  Credit/debit BookCoins manually (for seeding/testing).  
-  _Body:_ `{ to_user_id, coins, reason }`  
-  _Returns:_ `{ transfer_id, status: "APPLIED" }`  
-  _Emits:_ `wallet.credited` or `wallet.debited`
+- **POST /api/wallet/{userId}/release**
+    - Release previously reserved funds (used on cancel/failure). Idempotent by `(userId, swapId)`.
 
-- **(Internal) POST** `/wallet/settlements/swap`  
-  Used when a swap is accepted → debit buyer, credit seller atomically.  
-  _Body:_ `{ swap_id, buyer_id, seller_id, coins, request_key }`  
-  _Returns:_ `{ swap_id, status: "SETTLED", debit_ledger_id, credit_ledger_id }`  
-  _Emits:_ `wallet.debited`, `wallet.credited`, (optional) `swap.settled`
+- **(Internal) POST /wallet/settlements/swap**
+    - Settle a completed swap atomically (debit buyer, credit seller) — may be invoked by Wallet when observing
+      `swap.accepted` or by Swap as part of a settlement choreography.
 
----
+### Notification Service (key endpoints & behavior)
 
-### **Notification Service**
+- **GET /notify/stream** (WebSocket)
+    - Subscribe to real-time notifications for the signed-in user; the service pushes events consumed from Kafka (
+      swap/catalog events) to connected clients.
 
-_Owns: notifications (in-app only for MVP)_
+- **GET /notify?unreadOnly=true&limit=&cursor=**
+    - Fetch recent notifications and unread counts.
 
-- **GET** `/notify/stream` (WebSocket)  
-  Subscribe to real-time notifications for the signed-in user.  
-  _Returns:_ WS stream of messages `{ id, type, title, body, data, created_at }`
+- **POST /notify/read**
+    - Mark provided notification IDs (or all) as read.
 
-- **GET** `/notify?unreadOnly=true&limit=&cursor=`  
-  Fetch my recent notifications.  
-  _Returns:_ `{ items: [{ id, type, title, body, data, read, created_at }], next_cursor }`
+- **(Internal) POST /notify/publish**
+    - Enqueue an in-app notification (used by internal processes or for testing).
 
-- **POST** `/notify/read`  
-  Mark notifications as read.  
-  _Body:_ `{ ids: ["n1","n2"] }` or `{ all: true }`  
-  _Returns:_ `{ updated: 2 }`
+Behavior: Notification Service consumes `SWAP_CREATED`, `SWAP_CANCELLED`, `SWAP_COMPLETED`, and `BOOK_UNLISTED` (as
+needed) and translates those into short-lived, user-targeted WebSocket messages and lightweight DB entries for unread
+counts.
 
-- **(Internal) POST** `/notify/publish`  
-  Enqueue a simple in-app notification.  
-  _Body:_ `{ user_id, type, title, body, data }`  
-  _Returns:_ `{ id, status: "QUEUED" }`
+### Email Service (planned; key behavior)
 
----
+The Email Service is a dedicated consumer and outbound sender.
 
-### Data Stores by Service (MVP)
+- Responsibilities:
+    - Consume `BOOK_MEDIA_FINALIZED` / `BOOK_LISTED` (or similar finalization events) and persist the owner's email when
+      a book reaches a finalized/listed state. This requires the Catalog model to include an owner email field.
+    - Consume `SWAP_COMPLETED` events and send transactional emails to both parties involved in the swap with contact
+      details and next steps. Ensure idempotent sending (dedupe on `event_id`).
+    - Provide retry and dead-letter handling for delivery failures.
 
----
+(Planned endpoints for administration / manual resend):
 
-#### **Auth (Keycloak)**
+- **GET /emails/user/{userId}** — view persisted email addresses or email-send history.
+- **POST /emails/send** — manual/administration send (optional).
 
-- **DB:** Postgres (Keycloak’s own)
-- **Stores:** Users, credentials, roles, sessions
-- **Your services store:** Only `user_id` (from JWT `sub`) as foreign refs
+### BFF (Backend-for-Frontend) endpoints (examples)
 
----
+- **POST /bff/books/create**
+    - Orchestrates the full book-creation UX: calls Catalog create, starts media upload flow (Media init), and
+      optionally polls Valuation until a snapshot is available, returning a single composed payload the UI can use to
+      show progress.
 
-#### **API Gateway / Service Registry / Config**
+- **GET /bff/books/{bookId}/detail**
+    - Aggregates Catalog, Media, Valuation, and short notification state into a single optimized payload for the
+      frontend.
 
-- **DB:** None (stateless)
-- **Optional:** Redis for rate-limit counters; Git/Config-Server for configs
-
----
-
-#### **Catalog Service**
-
-- **DB:** Postgres
-- **Stores:**
-    - books (title, author, year, desc, isbn, owner_id)
-    - state (`DRAFT` | `LISTED` | `UNLISTED`)
-    - valuation snapshot (valuation_coins, confidence, policy_ver, asof)
-    - media refs (media_ids/URLs)
-    - basic facets (genre, condition_band, language)
-- **Why SQL:** filtering, pagination, matching by valuation range
+- **GET /bff/swaps?mine=true**
+    - Combines Swap + Catalog + Media (via Catalog bulk endpoints) so the UI shows enriched swap lists with book
+      thumbnails and valuations.
 
 ---
 
-#### **Media Service**
+## Accept Swap — canonical workflow (implementation-accurate)
 
-- **Blob Store:** S3/MinIO bucket (actual images + thumbnails)
-- **DB:** Postgres (metadata)
-- **Stores:**
-    - media_id, book_id, owner_id
-    - kind (`COVER` | `COND`)
-    - url, thumb_url, checksums, created_at
+This is the authoritative workflow for how the Swap Service completes an accepted swap. See `swap-service/README.md` and
+`swap-service/src/.../SwapService.java` for full implementation details.
 
----
+1. **Lock & validate**
+    - The responder triggers accept. Swap Service retrieves the swap row with a `FOR UPDATE` read (
+      `findBySwapIdForUpdate`) to avoid concurrent modifications and validates the responder identity and PENDING state.
 
-#### **Valuation Service**
+2. **Catalog confirmation**
+    - Swap Service calls Catalog's `confirmSwap(requesterBookId, responderBookId)` and waits (up to 10s). This call
+      finalizes ownership/state changes required on the Catalog side; failure aborts accept.
 
-- **DB:** None (MVP)
-- **Emits:** `valuation.ready` with `{ coins, confidence, policy_ver, asof }`
-- **Optional (later, Postgres):**
-    - valuation_audit (inputs, outputs, model/policy versions)
-    - valuation_policy (if you want versioned pricing rules)
+3. **Wallet confirmations**
+    - Swap Service calls Wallet confirm operations for both the requester and the responder (separate calls, each
+      blocked up to 10s). The service validates returned responses (message contains "confirmed", case-insensitive). Any
+      failure aborts accept.
 
----
+4. **Cancel other pending swaps**
+    - For the responder book (Book B) all other pending swaps are cancelled: for each pending swap, Swap Service
+      performs best-effort compensations — release wallet reservations for the requesters, unreserve their requester
+      books in Catalog, hard-delete those swap rows, and publish SWAP_CANCELLED events for notifications.
 
-#### **Swap Service**
+5. **Finalize accepted swap**
+    - The accepted swap row is deleted (hard delete) from the Swap DB instead of being transitioned to an
+      ACCEPTED/COMPLETED state.
+    - Swap Service writes an outbox `SWAP_COMPLETED` event for downstream consumers (Notification, Email, Catalog as
+      applicable).
 
-- **DB:** Postgres
-- **Stores:**
-    - swaps (swap_id, buyer_id, seller_id, target_book_id, offer_coins, state `PENDING` | `ACCEPTED` | `DECLINED` |
-      `CANCELLED` | `SETTLED`, timestamps, idempotency key)
-- **Why SQL:** state machine integrity + history
-
----
-
-#### **Wallet Service**
-
-- **DB:** Postgres
-- **Stores:**
-    - wallet_balances (per user)
-    - wallet_ledger (immutable double-entry with delta_coins, balance_after, ref_type/ref_id, request_key)
-- **Why SQL:** atomic debit/credit, strong consistency, auditability
+6. **Observability & reliability notes**
+    - Local DB operations are transactional and use pessimistic locking. External calls (Catalog, Wallet) are performed
+      outside the DB transaction and the service relies on best-effort compensations and idempotency guarantees from
+      downstream services.
+    - Timeouts are enforced (Catalog/Wallet confirmations use 10s blocking calls). The system relies on the outbox
+      pattern for reliable event publishing to Kafka.
 
 ---
 
-#### **Notification Service (simple in-app)**
+## Eventing & outbox (brief)
 
-- **DB:** Redis (AOF enabled) for fast append/read of user notification lists  
-  _(Option: Postgres if you want durable history from day one)_
-- **Stores:**
-    - `{ id, user_id, type, title, body, data, read, created_at }`
-
----
-
-### 1) Communication Style
-
-- **Client ↔ Services:** REST (via API Gateway, OAuth2 PKCE/JWT)
-- **Service ↔ Service, write-path coupling:** Kafka events (choreography/sagas)
-- **Point lookups (reads):** REST (e.g., UI asks Catalog; services avoid synchronous cross-calls unless absolutely
-  needed)
-- **Real-time UI:** Notification service pushes over WebSocket
+- Domain events (catalog, valuation, swap, wallet) are published via an outbox table written inside the service
+  transaction. A relay publishes outbox rows to Kafka and marks them as published.
+- Partition keys are chosen to preserve entity ordering: book_id for book events, swap_id for swap events, and
+  user_id/swap_id for wallet events.
 
 ---
 
-### 2) Kafka: Topics & Event Flow
+## Dev notes & next steps
 
-- Use domain topics with typed `type` fields, or one-per-domain:
-    - `catalog-events`
-    - `media-events`
-    - `valuation-events`
-    - `swap-events`
-    - `wallet-events`
-    - `notification-events` (optional audit)
-
-**All messages share an envelope (example):**
-
-```json
-{
-  "id": "uuid",
-  "type": "swap.accepted",
-  "source": "swap-service",
-  "time": "2025-09-27T04:10:00Z",
-  "subject": "swap_id",
-  "trace_id": "correlation-uuid",
-  "data": {
-    ...
-    domain
-    payload
-    ...
-  }
-}
-```
-
-**Partition keys:** choose to preserve ordering per entity
-
-- Books → `book_id`
-- Swaps → `swap_id`
-- Wallet ops → `user_id` (payer) or `swap_id` (settlement)
+- Implement the Email Service to persist owner emails (Catalog model update) and send `SWAP_COMPLETED` emails.
+- Build a Notification consumer that reads Swap outbox events and pushes WebSocket notifications.
+- Add more E2E tests for swap accept/cancel flows (cover happy & failure compensation paths).
+- Deploy plan: containerize services and publish with Kubernetes on AWS (planned for production readiness).
 
 ---
 
-#### Who Publishes / Who Consumes
-
-**Catalog Service**
-
-- **Publishes:**
-    - `book.created`, `book.listed`, `book.unlisted` → `catalog-events`
-- **Consumes:**
-    - `valuation.ready` (attach snapshot)
-    - `media.uploaded` (attach URLs)
-
-**Media Service**
-
-- **Publishes:**
-    - `media.uploaded { book_id, urls[] }` → `media-events`
-- **Consumes:** none
-
-**Valuation Service**
-
-- **Publishes:**
-    - `valuation.ready { book_id, coins, confidence, policy_ver }` → `valuation-events`
-- **Consumes:**
-    - `book.created`, `media.uploaded` (to (re)compute)
-
-**Swap Service**
-
-- **Publishes:**
-    - `swap.created`, `swap.accepted`, `swap.declined`, `swap.cancelled` → `swap-events`
-- **Consumes:**
-    - (Option A) `wallet.settled` or observe `wallet.debited`/`credited` to mark SETTLED (your choice)
-
-**Wallet Service**
-
-- **Publishes:**
-    - `wallet.debited`, `wallet.credited` (and optionally `wallet.settled { swap_id }`) → `wallet-events`
-- **Consumes:**
-    - `swap.accepted { swap_id, buyer_id, seller_id, coins }` → perform atomic DEBIT/CREDIT
-
-**Notification Service (simple in-app)**
-
-- **Publishes:** (optional audit) `notification.sent`
-- **Consumes:**
-    - `swap.created` (notify owner)
-    - `swap.accepted` (notify both)
-    - `swap.declined`/`swap.cancelled` (notify requester)
-    - `book.unlisted` (optional)
-
----
-
-### 3) Two Core Sagas (Choreography over Kafka)
-
-#### **Saga A: List a Book**
-
-1. REST Client → Catalog: `POST /catalog/books` → Catalog saves & emits `book.created`
-2. Media upload → Media stores S3 & emits `media.uploaded`
-3. Valuation consumes events, computes → emits `valuation.ready`
-4. Catalog consumes `valuation.ready` → stores snapshot (coins/conf)
-5. (Optional) Client → Catalog: `POST /catalog/books/{id}/list` → emits `book.listed`
-
-#### **Saga B: Accept a Swap**
-
-1. REST Client → Swap: `POST /swap/{id}/accept` → Swap checks states → emits `swap.accepted`
-2. Wallet consumes `swap.accepted` → atomic debit/credit → emits `wallet.debited`/`credited` (and/or `wallet.settled`)
-3. Swap observes wallet events → transitions to SETTLED
-4. Catalog (either on `swap.accepted` or `wallet.settled`) unlists the book → emits `book.unlisted`
-5. Notification consumes swap events → push in-app messages (WS)
-
----
-
-### Event Reliability: Outbox Pattern
-
-**TL;DR:**  
-Whenever a request changes state in our DB and we need to publish an event (e.g., `book.created`), we first write the
-change and an event row into the same database transaction (the outbox table). A background relay reads the outbox and
-publishes to Kafka, marking rows as published.
-
----
-
-#### **Why We Use Outbox**
-
-- **Avoid dual-write bugs:** Prevents “DB committed but event lost” and “event published but DB rolled back.”
-- **Reliability with retries:** The relay retries until Kafka accepts; events aren’t lost during broker outages.
-- **Idempotency:** Every event has a stable `event_id`; consumers dedupe on that.
-- **Operability:** Easy to inspect/rehydrate—events are queryable in SQL.
-
----
-
-#### **How It Works (Brief)**
-
-1. **In the service transaction:**  
-   Persist domain change **and** insert an outbox row (`event_id`, `aggregate_type`, `aggregate_id`, `type`, `payload`,
-   `occurred_at`, `published_at` = NULL).
-2. **TX commits:**  
-   Both records are durable.
-3. **Relay process:**  
-   Polls the outbox, publishes to Kafka, then sets `published_at = NOW()` (idempotent).
-
----
-
-#### **Scope**
-
-- **Enabled:** Catalog, Swap, Wallet (event-driven, cross-service side effects)
-- **Optional/Deferred:** Media, Notifications, Valuation, User-Profile (can add later if/when they emit domain events)
-
----
-
-### Design/Architecture for each Microservice
-
----
-
-#### **Connectors**
-
-**API Gateway Service — Layered**
-
-- Thin routing, auth offload (Keycloak resource server), rate limiting, request logging.
-- Keep controllers skinny; no domain logic.
-- Add circuit breakers/timeouts on outbound calls.
-
-**Eureka Server Service — N/A (infra component)**
-
-- Run it as-is; no app logic.
-- Externalize config only.
-
-**Config Server Service — N/A (infra component)**
-
-- Centralized config, profiles per env, secrets via environment/secret store.
-- No business logic.
-
-**Auth/User Service — Layered (thin)**
-
-- If using Keycloak for identities, this holds only app-profile fields (display name, prefs).
-- Controllers → Service → Repo.
-- Keep it simple.
-- No events for MVP (add Outbox later if it ever emits).
-
----
-
-#### **Domain Services**
-
-**Catalog Service — Layered (+ Outbox)**
-
-- CRUD + list/detail endpoints.
-- Service layer owns transactions and rules (e.g., who can edit, status changes).
-- Repos for persistence and optional query-repos for complex reads.
-- Write Outbox rows on create/update so downstream (Search/Notifications/Valuation) get events reliably.
-- Optional short-TTL Redis cache for “browse” lists.
-
-**Media Service (for pics) — Layered (IO-focused)**
-
-- Controller → Service → Repo (metadata) + S3 adapter (uploads/thumbnails).
-- Keep image processing async via a simple internal queue or just synchronous for MVP.
-- Emit events later if needed; Outbox can be deferred.
-
-**AI Valuation Service — Layered (stateless worker)**
-
-- HTTP endpoint for on-demand estimate plus a background consumer if you later do async.
-- Keep the “model” behind a small interface so you can swap rule-based → ML later.
-- No DB needed beyond a run log.
-- Outbox optional (emit valuation.completed only if others rely on it).
-
-**Swap Service — Layered (disciplined) + Outbox**
-
-- Impose the state machine in the service layer (Requested → Accepted → InTransit → Fulfilled/Cancelled) with guards (
-  ownership, expiry).
-- Persist swaps; write Outbox events (swap.requested/accepted/fulfilled) in the same tx.
-- Add idempotency keys on risky mutations (accept/cancel).
-- Consider a small “policy” helper class to keep transition rules tidy.
-
-**Wallet Service — Hexagonal (Ports & Adapters) + Outbox**
-
-- Money = correctness. Keep a pure domain: WalletAccount, LedgerEntry, Money, Hold.
-- Ports: LedgerRepository, EventPublisher, IdempotencyStore, optionally Clock.
-- Infra adapters: Postgres (append-only ledger), Outbox relay to Kafka, Redis (idempotency).
-- Expose a read projection (wallet_balance) for quick UI.
-
-**Notification Service — Hexagonal (event in → channels out)**
-
-- Driving adapter: Kafka consumer (listens to catalog/swap/wallet events).
-- Domain: simple routing/rate-limit policies, template selection.
-- Ports: EmailSender, WsBroadcaster, TemplateRepository.
-- Infra adapters implement SMTP/SendGrid, WebSocket hub, template store.
-- Outbox usually not needed here (it’s a sink), but keep retries and dead-letter handling.
-
-Note:
-for keycloak, to login or register with postman,
-go to postman and bookswap/keycloak folder
-
-- we have a web-frontend keycloak client who handles login/register
-- go to auth and click get new token and use those params already there
-- pop-up will have both login and register features
-- in our system, each microservice will call keycloak introspect to verify
-- token; so we made an endpoint for it on postman
-- for it, we need under auth -> basic auth -> username=client-id, password=client secret
-- we made a client called bookswap-backend for this purpose
-- then for this request, under body, use formdata and token = user's jwt token
-- shud return 200 for success with user info
-- for logout, we made a temp logout endpoint on postman
-- it shud have no auth, and body shud have client_id=web-frontend
-- and shud be given refresh_token for that user (NOT token)
-
---
-
-## Backend Workflow: Book Creation, Media, and Valuation
-
-This section summarizes the main workflow for registering a book, uploading images, and getting a valuation, showing how
-the frontend and microservices interact.
-
-### 1. Book Creation (Catalog Service)
-
-- **Frontend** calls `POST /api/catalog/books` with book metadata.
-- **Catalog Service** creates a new book entry (state = DRAFT).
-- **Catalog Service** publishes `BOOK_CREATED` event to Kafka.
-
-### 2. Image Upload (Media Service)
-
-- **Frontend** calls `POST /api/media/uploads/{bookId}/init` to get pre-signed S3 URLs for image upload.
-- **Media Service** creates media records (status = PENDING) and returns pre-signed S3 URLs.
-- **Frontend** uploads images directly to S3 using the pre-signed URLs (PUT, with correct Content-Type).
-- **Frontend** calls `POST /api/media/uploads/{mediaId}/complete` to confirm upload.
-- **Media Service** verifies the upload, marks media as STORED, and publishes `MEDIA_STORED` event to Kafka.
-
-### 3. Catalog Updates Media
-
-- **Catalog Service** listens for `MEDIA_STORED` events from Kafka.
-- On receiving the event, it updates the book's media list (e.g., sets primaryMediaId if not already set).
-- When all required media are present, **Catalog Service** publishes `BOOK_MEDIA_FINALIZED` event to Kafka.
-
-### 4. Book Valuation (Valuation Service - Planned)
-
-- **Valuation Service** listens for `BOOK_MEDIA_FINALIZED` events from Kafka.
-- On receiving the event, it fetches book metadata from Catalog and media from Media Service.
-- It passes the book and media to an LLM/AI to determine BookCoin value.
-- **Valuation Service** publishes `VALUATION_READY` event to Kafka.
-
-### 5. Catalog Updates Valuation
-
-- **Catalog Service** listens for `VALUATION_READY` events from Kafka.
-- On receiving the event, it updates the book's valuation field in the database.
-- The book entry is now fully created, with metadata, images, and valuation.
-
-This workflow ensures that book creation, media upload, and valuation are decoupled, reliable, and event-driven. Each
-service is responsible for its own data and state, and communicates changes via Kafka events.
+For more detail about a specific service, open its README in the corresponding subfolder — they contain API examples,
+sequence diagrams, and implementation notes.

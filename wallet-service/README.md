@@ -17,10 +17,15 @@ row-level locking for consistency.
 
 ### Manual/Backoffice (Testing)
 
-- **POST /api/wallet/{userId}/add**
-    - Body: `{ amount }` → available += amount
-- **POST /api/wallet/{userId}/delete**
-    - Body: `{ bookId, amount }` → available -= amount (409 if insufficient)
+- **POST /api/wallet/ops/{userId}/add**
+    - Body: BookFinalizedEvent (used to credit a user's wallet when a book becomes finalized/listed) → available +=
+      amount
+- **POST /api/wallet/ops/{userId}/delete**
+    - Body: BookUnlistedEvent (used to debit a user's wallet when a book is unlisted/deleted) → available -= amount (409
+      if insufficient)
+
+> Note: these ops are exposed under `/api/wallet/ops` and are typically used by internal consumers (Catalog/Valuation)
+> or backoffice tooling.
 
 ### Swap Workflow (Direct S2S from Swap)
 
@@ -28,11 +33,16 @@ row-level locking for consistency.
     - Body: `{ amount, swapId, bookId }` -- create hold for swap
 - **POST /api/wallet/{userId}/release**
     - Body: `{ amount, swapId, bookId }` -- cancel hold
-- **POST /api/wallet/{userId}/capture**
-    - Body: `{ amount, swapId, bookId }` -- removed: due to swap success or use deletion
+- **POST /api/wallet/{userId}/requester/confirm**
+    - Confirm reservation for the requester (used during swap accept flow). Accepts a WalletMutationRequest and returns
+      a WalletMutationResponse. The Swap Service calls this when confirming the requester side.
+- **POST /api/wallet/{userId}/responder/confirm**
+    - Confirm reservation (or settlement) for the responder (used during swap accept flow). Accepts a
+      WalletMutationRequest and returns a WalletMutationResponse. The Swap Service calls this when confirming the
+      responder side.
 
-Responses for mutating calls: `{ available, reserved, total, status }`
-Auth: user JWT for /me/balance; service tokens (Swap/Catalog/admin) for others.
+Responses for mutating calls: `{ available, reserved, total, status }` (see DTOs in service for exact shapes)
+Auth: user JWT for `/me/balance`; service tokens (Swap/Catalog/admin) for other endpoints.
 
 ---
 
@@ -111,18 +121,20 @@ Auth: user JWT for /me/balance; service tokens (Swap/Catalog/admin) for others.
 
 ### Swap (Direct HTTP)
 
-- Reserve: Swap → /reserve → available -= amount, reserved += amount, wallet_reservation: ACTIVE.
-- Release: Swap → /release → reserved -= amount, available += amount, reservation → RELEASED.
-- Capture: Swap → /capture → reserved -= amount, reservation → CAPTURED (final debit).
+- Reserve: Swap → `/api/wallet/{userId}/reserve` → available -= amount, reserved += amount, wallet_reservation: ACTIVE.
+- Release: Swap → `/api/wallet/{userId}/release` → reserved -= amount, available += amount, reservation → RELEASED.
+- Confirm (accept): Swap → `/api/wallet/{userId}/requester/confirm` and `/api/wallet/{userId}/responder/confirm` → each
+  side validates and marks reservation as confirmed (final debit/credit handled as part of confirm flow / settlement
+  choreography).
 
 ---
 
 ## Implementation Notes
 
-- **No Kafka Publishers:**
-    - The wallet service only listens to events (such as book valuation or swap completion) and updates the wallet
-      accordingly. It does not publish events to Kafka because no other service needs to consume wallet events directly.
-      This design keeps the wallet logic simple and avoids unnecessary event propagation.
+- **No Kafka Publishers (by default):**
+    - The wallet service primarily listens to events (such as book valuation or swap completion) and updates the wallet
+      accordingly. It does not necessarily publish events to Kafka unless configured to do so for
+      analytics/notifications.
 
 - **Database Locking:**
     - Some wallet operations (such as reserving or releasing book coins) use row-level locking during database
