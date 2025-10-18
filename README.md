@@ -9,7 +9,7 @@ service endpoints with what they do.
 
 ---
 
-## Project snapshot (short)
+## Project snapshot
 
 - Goal: Build a reliable, event-driven market for swapping books with clear ownership, valuations, and a lightweight
   BookCoin currency.
@@ -18,7 +18,7 @@ service endpoints with what they do.
 
 ---
 
-## Services & responsibilities (summarized)
+## Services & responsibilities
 
 - **Catalog Service** — owns book records and lifecycle (draft → listed → unlisted/swapped). Stores book metadata,
   valuation snapshot, media refs, and owner info (including planned owner email field to support the Email Service).
@@ -49,7 +49,7 @@ service endpoints with what they do.
 
 ---
 
-## Service Endpoints (high-level)
+## Service Endpoints
 
 Below is a compact list of the primary endpoints for each microservice and what they do (no request/response shapes
 here — see each service README for full API contracts).
