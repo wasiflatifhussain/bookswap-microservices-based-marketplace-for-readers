@@ -81,6 +81,8 @@ for CRUD operations and participates in the event-driven workflow via Kafka.
   }
   ```
 - **Publishes Kafka Event:** `BOOK_UNLISTED` (topic: `catalog-events`)
+- **VIP NOTE:** this end point, or it's corresponding SWAP SERVICE needs fixing so that, when a book is unlisted, all
+  corresponding requests for that book in SWAP DB are removed and funds re-allocated to the requesters.
 
 ---
 

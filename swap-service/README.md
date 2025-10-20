@@ -184,7 +184,9 @@ Once this setup is done, Swap can securely communicate with other microservices 
 checks in code — permissions are handled entirely through Keycloak service roles and audience configuration.
 
 ## VIP Improvements needed in the future:
-
+- P1 Task: When a responder unlists a books, then it posts BOOK_UNLISTED event. We need to
+  automatically cancel all pending swaps for that book and notify the requesters. Swap Service can listen to the event and
+  perform the cancellations and post SWAP_CANCELED events for notifications. 
 - P1 Incident: We require rollbacks in service layer. As we are calling multiple external services, if any of them fail,
   we need to rollback the previous successful calls. Current use of @Transactional only covers local DB operations. We
   need to either implement a saga pattern with Kafka or retry mechanisms with idempotency keys. The main idea is that if
