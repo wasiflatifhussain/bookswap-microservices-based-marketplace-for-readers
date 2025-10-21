@@ -1,90 +1,89 @@
-# 0) Tech baseline (Initializr picks)
+# Notification Service
 
-* Spring Web
-* Spring Security (OAuth2 Resource Server)
-* Spring Data JPA
-* PostgreSQL Driver
-* Spring for Apache Kafka
-* Spring Data Redis (Access + Driver)
-* Validation
-* Actuator
-* Lombok
-* Spring Configuration Processor
-
-> Dev DB schema: use `spring.jpa.hibernate.ddl-auto=update` (dev-only). No migrations.
-
----
+This README documents the notification microservice (purpose, tech baseline, data model, Redis usage, Kafka consumption
+rules, REST contract, ops notes and a recommended implementation order). It has been updated to match the service code
+in this repo (`com.bookswap.notification_service.*`) and the controller endpoints currently implemented.
 
 # 1) Minimal project skeleton
 
 ```
 notification-service
-└─ src/main/java/com/bookswap/notification
+└─ src/main/java/com/bookswap/notification_service
    ├─ NotificationServiceApplication.java
-   ├─ config/                # only lightweight config beans
+   ├─ config/                # lightweight config beans
    │   ├─ KafkaConfig.java
-   │   └─ SecurityConfig.java
+   │   └─ RedisConfig.java
+   ├─ controller/            # REST controllers
+   │   └─ NotificationController.java
    ├─ domain/
-   │   ├─ Notification.java        
+   │   ├─ Notification.java
+   │   ├─ BookSnapshot.java
    │   ├─ NotificationType.java
    │   └─ NotificationRepository.java
    ├─ service/
    │   ├─ UnreadCounterService.java  # Redis INCR/DECR
-   │   └─ NotificationWriter.java    # DB write + counters
+   │   ├─ NotificationService.java   # business logic + DB writes
+   │   └─ BookSnapshotService.java   # store/delete snapshots from catalog events
    ├─ messaging/
-   │   └─ KafkaEventListener.java    # @KafkaListener; maps events → notifications
-   └─ api/
-       ├─ NotificationController.java # list, unread-count, mark-read
-       └─ dto/
-          ├─ NotificationItemDto.java
-          └─ MarkReadRequest.java
+   │   └─ KafkaSwapEventsListener.java
+   │   └─ KafkaCatalogEventsListener.java
+   └─ dto/                     # event/response DTOs
 ```
-
-# 3) The only model needed
-
-**Entity**
-
-* `id : UUID` (PK)
-* `userId : UUID` (recipient)
-* `type : NotificationType` (`SWAP_CREATED|SWAP_CANCELLED|SWAP_COMPLETED|BOOK_UNLISTED`)
-* `title : String (≤128)`
-* `body : String (≤512, nullable)`
-* `metadataJson : String` (JSON text; small blob like `{ "swapId": "...", "bookId": "...", "deeplink": "/swaps/..." }`)
-* `createdAt : Instant` (default now)
-* `readAt : Instant?` (null = unread)
-* `sourceEventId : UUID UNIQUE` (idempotency per upstream event)
-
-**Repository (methods we’ll use immediately)**
-
-* `Page<Notification> findByUser(userId, unreadOnly, Pageable)`
-* `int markRead(userId, ids)` (returns rows updated)
-* `int markAllRead(userId)`
-* `long countByUserIdAndReadAtIsNull(userId)`
-
-> With `ddl-auto=update`, the unique constraint on `sourceEventId` is created from the annotation. No Flyway needed.
 
 ---
 
-# 4) Redis usage (tiny and fast)
+# 2) Concise model view
+
+Entity: Notification (see `domain/Notification.java`)
+
+* `notificationId : UUID` (PK, generated)
+* `userId : String` (recipient id, stored as string)
+* `notificationType : NotificationType` (`SWAP_CREATED|SWAP_CANCELLED|SWAP_COMPLETED|BOOK_UNLISTED`)
+* `title : String`
+* `readStatus : ReadStatus` (`UNREAD|READ`)
+* `description : String` (Lob)
+* `createdAt`, `updatedAt`
+
+Entity: BookSnapshot (see `domain/BookSnapshot.java`)
+
+* `bookId : String` (PK)
+* `title, author, bookCondition, valuation, ownerUserId`
+* `createdAt`, `updatedAt`
+
+Note: earlier design mentioned storing a `sourceEventId` for idempotency — the current code does not include it. Adding
+a unique `sourceEventId` column is recommended if idempotent processing of upstream events is required in a future
+iteration.
+
+---
+
+# 3) Redis usage (simple counter cache)
 
 * Key: `unread:{userId}` → integer
 
     * On create: `INCR unread:{userId}`
     * On mark read: `DECRBY unread:{userId} N` (clamp to ≥0)
     * On mark all: `SET unread:{userId} 0`
-* No storing notifications in Redis—only counters.
 
-`UnreadCounterService` wraps `StringRedisTemplate` with 3 methods: `incr`, `decr(n)`, `reset`, `get`.
+`UnreadCounterService` is a thin wrapper around `StringRedisTemplate` with methods: `increment`, `decrement`, `reset`,
+`getIfPresent`.
 
 ---
 
-# 5) Kafka consumption (event → one or more notification rows)
+# 4) Kafka consumption (events → notification rows)
 
-**Topics**
+**Topics (configured via properties)**
 
-* `swap.events` (key=`swap_id`), `catalog.events` (key=`book_id`)
+* `spring.kafka.consumer.services.swap-service.topic` (swap.events)
+* `spring.kafka.consumer.services.catalog-service.topic` (catalog.events)
 
-**Expected envelope (keep it flexible via Map/record)**
+The listeners live in `messaging/` and route events to service-level handlers:
+
+* `KafkaSwapEventsListener` → reacts to `SWAP_CREATED`, `SWAP_CANCELLED`, `SWAP_COMPLETED` and calls methods in
+  `NotificationService`.
+* `KafkaCatalogEventsListener` → reacts to `BOOK_VALUATION_FINALIZED` (stores book snapshot) and `BOOK_UNLISTED` (
+  deletes snapshot).
+
+Expected event envelope (keep flexible; DTOs are used to map JSON payloads):
 
 ```json
 {
@@ -102,54 +101,55 @@ notification-service
 }
 ```
 
-**Recipient rules**
+Recipient rules implemented in `NotificationService`:
 
-* `SWAP_CREATED` → responderId
-* `SWAP_CANCELLED` → the other party
-* `SWAP_COMPLETED` → requesterId & responderId
-* `BOOK_UNLISTED` → owner (optional now)
+* `SWAP_CREATED` → notify the responder (owner of the responder book)
+* `SWAP_CANCELLED` → notify the requester (owner of the requester book)
+* `SWAP_COMPLETED` → notify both requester and responder
+* `BOOK_UNLISTED` → delete the book snapshot (optional notification to owner)
 
-**Processing flow**
+Processing flow inside listeners/services:
 
-1. Derive recipients (1 or 2).
-2. Build `Notification` (title/body/metadataJson).
-3. **Idempotent insert**: `sourceEventId` unique; if duplicate → skip.
-4. If inserted → `INCR` unread counter for that user.
-5. Commit Kafka offset **after** DB write succeeds.
-
-> Keep mapper logic in `NotificationWriter` so `@KafkaListener` stays thin and testable.
+1. Parse event → map to a DTO (SwapCreatedEvent, SwapCancelEvent, SwapCompletedEvent, BookFinalizedEvent,
+   BookUnlistedEvent).
+2. `NotificationService` loads `BookSnapshot`s (requester/responder) as needed.
+3. Build `Notification` entity and save it.
+4. After transaction commit, call Redis `INCR` to bump the unread counter via
+   `TransactionSynchronizationManager.registerSynchronization` so offsets are committed only after DB writes succeed.
 
 ---
 
-# 6) REST API (MVP)
+# 5) REST API (MVP)
 
-All endpoints require JWT (subject = `userId`).
+All endpoints expect JWT authentication (the controller extracts `authentication.getName()` as the `userId`). Current
+base path: `/api/notifications`.
 
-* `GET /notify?unreadOnly=true&size=20&page=0`
+* `GET /api/notifications/get?unreadOnly=true&page=0&size=20`
 
     * Returns paged list (or switch to keyset later).
     * Response item = `{ id, type, title, body?, metadata, createdAt, read }`.
 
-* `GET /notify/unread-count`
+* `GET /api/notifications/unread-count`
 
     * Reads Redis. On cache miss, fall back to `repo.countByUserIdAndReadAtIsNull()` and **repair** Redis.
 
-* `POST /notify/read`
+* `POST /api/notifications/read`
 
     * Body either `{ "ids": ["uuid1","uuid2"] }` or `{ "all": true }`.
     * Update DB (`readAt=now()`), compute `updatedCount`, then `DECRBY` Redis by that count (or `SET 0` for all).
     * Return `{ "updated": n, "unread": current }`.
 
-> Frontend flow: page loads → call `/notify/unread-count` for badge, `/notify` for list. Clicking “mark all” or
-> individual items calls `/notify/read`.
+> Frontend flow: page loads → call `/api/notifications/unread-count` for badge, `/api/notifications/get` for list.
+> Clicking “mark all” or
+> individual items calls `/api/notifications/read`.
 
 ---
 
-# 7) WebSocket (optional first, simple later)
+# 7) WebSocket (future implementation)
 
-Add WS in a later iteration:
+Add WS in later iteration:
 
-* `GET /notify/stream` (JWT on connect).
+* `GET /api/notifications/stream` (JWT on connect).
 * On each DB insert (step 3 above), if also maintain a simple in-memory `Map<userId, sessions>` (or Redis set when
   scale), push a tiny message:
 
@@ -165,120 +165,10 @@ Add WS in a later iteration:
 * If no session → do nothing; REST still covers it.
 
 > Start without WS. Add once REST + counters + Kafka are stable.
-
 ---
 
-# 8) Observability & ops (tiny)
+# 9) Future notes / optional improvements
 
-* Actuator: `/actuator/health`, `/actuator/metrics`.
-* Useful counters/timers:
-
-    * notifications_inserted_total{type}
-    * kafka_events_consumed_total
-    * unread_counter_repairs_total
-* Log `event_id`, `user_id`, and insert outcome (inserted/duplicate).
-
----
-
-# 9) Implementation order (tickets)
-
-1. **Boot skeleton**
-
-    * Initializr setup, `application.yml`, Actuator up.
-
-2. **Domain + JPA**
-
-    * `NotificationType`, `Notification`, `NotificationRepository`.
-    * Bring app up once; ensure table created (`ddl-auto=update`).
-
-3. **Redis counters**
-
-    * `UnreadCounterService` (+ config).
-    * Manual test via a dummy `CommandLineRunner` that increments/decrements.
-
-4. **NotificationWriter**
-
-    * `create(recipient, type, title, body?, metadataJson, sourceEventId)`
-    * Idempotent save + counter increment.
-
-5. **REST API**
-
-    * `GET /notify`, `GET /notify/unread-count`, `POST /notify/read`.
-    * Local curl tests.
-
-6. **Kafka listener**
-
-    * `@KafkaListener` on `swap.events` (and `catalog.events` if needed).
-    * Map events → recipients → `NotificationWriter.create(...)`.
-
-7. **Security (JWT)**
-
-    * Resource server config; extract `userId` from token (subject/claim).
-
-8. **(Optional) WebSocket**
-
-    * Basic `/notify/stream` and in-JVM session map.
-
-9. **Hardening**
-
-    * Retry on transient DB errors; commit offsets only after success.
-    * Clamp Redis counter ≥ 0; repair on `/unread-count` cache miss.
-
----
-
-# 10) Tiny “contract” for the frontend
-
-**List:**
-
-```json
-GET /notify?unreadOnly=true&size=20&page=0
-{
-"items": [
-{
-"id": "…",
-"type": "SWAP_COMPLETED",
-"title": "Swap completed 🎉",
-"body": "You swapped 'The Hobbit'",
-"metadata": { "swapId": "…", "bookId": "…", "deeplink": "/swaps/..."},
-"createdAt": "2025-10-19T04:35:12Z",
-"read": false
-}
-],
-"page": 0,
-"size": 20,
-"total": 17
-}
-```
-
-**Badge:**
-
-```json
-GET /notify/unread-count
-{
-  "unread": 3
-}
-```
-
-**Mark read:**
-
-```json
-POST /notify/read
-{
-  "ids": [
-    "uuid1",
-    "uuid2"
-  ]
-}
--- or --
-{
-  "all": true
-}
-
-Response:
-{
-"updated": 2,
-"unread": 1
-}
-```
+* Add a WebSocket endpoint `/api/notifications/stream` to push live notifications.
 
 ---
