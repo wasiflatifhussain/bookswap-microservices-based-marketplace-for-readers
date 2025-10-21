@@ -33,7 +33,10 @@ spring:
           topic: catalog.events
           group-id: notification-catalog-consumers
       auto-offset-reset: earliest
-
+  redis:
+    host: localhost
+    port: 6379
+    
 server:
   port: 8086
 
