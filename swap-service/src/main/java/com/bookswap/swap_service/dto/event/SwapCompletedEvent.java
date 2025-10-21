@@ -1,4 +1,4 @@
-package com.bookswap.swap_service.domain.event;
+package com.bookswap.swap_service.dto.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

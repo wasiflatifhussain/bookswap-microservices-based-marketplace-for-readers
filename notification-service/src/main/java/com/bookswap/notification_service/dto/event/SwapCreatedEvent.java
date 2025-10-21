@@ -1,4 +1,4 @@
-package com.bookswap.swap_service.domain.event;
+package com.bookswap.notification_service.dto.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,10 +9,11 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class SwapCancelEvent {
+public class SwapCreatedEvent {
   private String swapId;
   private String requesterUserId;
   private String responderUserId;
   private String requesterBookId;
   private String responderBookId;
+  private String responderBookName;
 }
