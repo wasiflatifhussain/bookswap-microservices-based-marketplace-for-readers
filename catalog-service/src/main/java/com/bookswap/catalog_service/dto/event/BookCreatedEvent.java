@@ -17,4 +17,5 @@ public class BookCreatedEvent {
   private String author;
   private BookCondition bookCondition;
   private String ownerUserId;
+  private String ownerEmail;
 }

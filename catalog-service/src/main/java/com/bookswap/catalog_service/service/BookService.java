@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +34,9 @@ public class BookService {
     log.info("Initiating adding book to for title={}", bookRequest.getTitle());
 
     try {
-      Book book = mapRequestToBook(bookRequest, keycloakId);
+
+      String ownerEmail = currentUserEmailOrNull();
+      Book book = mapRequestToBook(bookRequest, keycloakId, ownerEmail);
       Book savedBook = bookRepository.save(book);
 
       BookCreatedEvent bookCreatedEvent =
@@ -43,6 +47,7 @@ public class BookService {
               .author(savedBook.getAuthor())
               .bookCondition(savedBook.getBookCondition())
               .ownerUserId(savedBook.getOwnerUserId())
+              .ownerEmail(savedBook.getOwnerEmail())
               .build();
 
       outboxService.enqueueEvent(
@@ -361,13 +366,19 @@ public class BookService {
 
   @Transactional
   public Boolean confirmSwap(String requesterBookId, String responderBookId) {
-    log.info("Initializing confirm swap for requesterBookId={} and responderBookId={}", requesterBookId, responderBookId);
+    log.info(
+        "Initializing confirm swap for requesterBookId={} and responderBookId={}",
+        requesterBookId,
+        responderBookId);
 
     try {
       Optional<Book> bookRequesterBookOpt = bookRepository.findByBookId(requesterBookId);
       Optional<Book> bookResponderBookOpt = bookRepository.findByBookId(responderBookId);
       if (bookResponderBookOpt.isEmpty() || bookRequesterBookOpt.isEmpty()) {
-        log.warn("Book not found for changing bookStatus for requesterBookId={} and responderBookId={}", requesterBookId, responderBookId);
+        log.warn(
+            "Book not found for changing bookStatus for requesterBookId={} and responderBookId={}",
+            requesterBookId,
+            responderBookId);
         return false;
       }
 
@@ -375,17 +386,17 @@ public class BookService {
       Book responderBook = bookResponderBookOpt.get();
       if (requesterBook.getBookStatus() != BookStatus.RESERVED) {
         log.warn(
-                "Book not reserved currently for changing status with requesterBookId={} and currentStatus={}",
-                requesterBookId,
-                requesterBook.getBookStatus());
+            "Book not reserved currently for changing status with requesterBookId={} and currentStatus={}",
+            requesterBookId,
+            requesterBook.getBookStatus());
         return false;
       }
 
       if (responderBook.getBookStatus() != BookStatus.AVAILABLE) {
         log.warn(
-                "Book not available currently for changing status with responderBookId={} and currentStatus={}",
-                responderBookId,
-                responderBook.getBookStatus());
+            "Book not available currently for changing status with responderBookId={} and currentStatus={}",
+            responderBookId,
+            responderBook.getBookStatus());
         return false;
       }
 
@@ -393,7 +404,10 @@ public class BookService {
       bookRepository.save(requesterBook);
       responderBook.setBookStatus(BookStatus.SWAPPED);
       bookRepository.save(responderBook);
-      log.info("Book status changed successfully for requesterBookId={} and responderBookId={}", requesterBookId, responderBookId);
+      log.info(
+          "Book status changed successfully for requesterBookId={} and responderBookId={}",
+          requesterBookId,
+          responderBookId);
       return true;
     } catch (Exception e) {
       log.error("Error while changning book status with error=", e);
@@ -401,11 +415,22 @@ public class BookService {
     }
   }
 
+  private String currentUserEmailOrNull() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null) return null;
+    Object details = auth.getDetails();
+    if (details instanceof Map<?, ?> map) {
+      Object e = map.get("email");
+      return e != null ? e.toString() : null;
+    }
+    return null;
+  }
+
   private static <T> T firstOrNull(List<T> list) {
     return (list != null && !list.isEmpty()) ? list.get(0) : null;
   }
 
-  private Book mapRequestToBook(BookRequest bookRequest, String keycloakId) {
+  private Book mapRequestToBook(BookRequest bookRequest, String keycloakId, String ownerEmail) {
     return Book.builder()
         .title(bookRequest.getTitle())
         .description(bookRequest.getDescription())
@@ -415,6 +440,7 @@ public class BookService {
         .valuation(bookRequest.getValuation())
         .bookStatus(BookStatus.AVAILABLE)
         .ownerUserId(keycloakId)
+        .ownerEmail(ownerEmail)
         .mediaIds(bookRequest.getMediaIds())
         .build();
   }
