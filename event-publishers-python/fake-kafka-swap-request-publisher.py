@@ -12,7 +12,7 @@ def b(s: str) -> bytes:
 
 
 def main():
-    with open("swap_fixture.json") as fp:
+    with open("../swap_fixture.json") as fp:
         fx = json.load(fp)
 
     swap_id = f"swap-{uuid.uuid4()}"
@@ -41,7 +41,7 @@ def main():
     producer.close()
 
     fx["swapId"] = swap_id
-    with open("swap_fixture.json", "w") as fp:
+    with open("../swap_fixture.json", "w") as fp:
         json.dump(fx, fp, indent=2)
 
     print(f"Sent SWAP_CREATED for swapId={swap_id}")

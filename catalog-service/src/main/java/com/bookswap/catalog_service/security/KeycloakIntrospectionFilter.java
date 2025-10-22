@@ -5,6 +5,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +44,7 @@ public class KeycloakIntrospectionFilter extends OncePerRequestFilter {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   protected void doFilterInternal(
       HttpServletRequest req, HttpServletResponse res, FilterChain chain)
       throws ServletException, IOException {
@@ -71,14 +74,23 @@ public class KeycloakIntrospectionFilter extends OncePerRequestFilter {
         return;
       }
 
-      String principal = (String) body.get("sub");
-      log.info("Current Principal User={}", body.get("sub"));
-      SecurityContextHolder.getContext()
-          .setAuthentication(
-              new UsernamePasswordAuthenticationToken(principal, null, java.util.List.of()));
+      String userId = body.get("sub") != null ? body.get("sub").toString() : null;
+      String email = body.get("email") != null ? body.get("email").toString() : null;
+
+      UsernamePasswordAuthenticationToken authentication =
+          new UsernamePasswordAuthenticationToken(userId, null, List.of());
+
+      Map<String, Object> authenticationDetails = new HashMap<>();
+      authenticationDetails.put("sub", userId);
+      authenticationDetails.put("email", email);
+      authentication.setDetails(authenticationDetails);
+
+      log.info("Current userId={} and email={}", userId, email);
+      SecurityContextHolder.getContext().setAuthentication(authentication);
 
       chain.doFilter(req, res);
     } catch (Exception e) {
+      log.error("Token introspection failed", e);
       res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token introspection failed");
     }
   }

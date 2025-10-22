@@ -11,7 +11,7 @@ def b(s: str) -> bytes:
 
 
 def main():
-    with open("swap_fixture.json") as fp:
+    with open("../swap_fixture.json") as fp:
         fx = json.load(fp)
 
     required = ["swapId", "requesterUserId", "responderUserId", "requesterBookId", "responderBookId"]

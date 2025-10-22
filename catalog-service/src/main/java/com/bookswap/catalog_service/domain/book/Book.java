@@ -41,6 +41,8 @@ public class Book {
   private List<String> mediaIds;
   private String ownerUserId;
 
+  private String ownerEmail;
+
   @CreationTimestamp private LocalDateTime createdAt;
   @UpdateTimestamp private LocalDateTime updatedAt;
 }
