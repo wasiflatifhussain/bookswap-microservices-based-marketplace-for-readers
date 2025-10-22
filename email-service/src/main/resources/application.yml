@@ -33,3 +33,8 @@ spring:
           topic: swap.events
           group-id: email-swap-consumers
       auto-offset-reset: earliest
+
+email:
+  resend:
+    api-key: ${RESEND_API_KEY}
+    from-address: "BookSwap <no-reply@bookswap.work>"

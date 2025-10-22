@@ -1,6 +1,6 @@
 package com.bookswap.email_service.messaging;
 
-import com.bookswap.email_service.dto.event.BookCreatedEvent;
+import com.bookswap.email_service.dto.event.SwapCompletedEvent;
 import com.bookswap.email_service.service.EmailService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -12,36 +12,39 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class KafkaCatalogEventsListener {
+public class KafkaSwapEventsListener {
 
   private final ObjectMapper objectMapper;
   private final EmailService emailService;
 
   @KafkaListener(
-      topics = "${spring.kafka.consumer.services.catalog-service.topic}",
-      groupId = "${spring.kafka.consumer.services.catalog-service.group-id}")
-  public void onCatalogEvent(ConsumerRecord<String, String> rec) {
+      topics = "${spring.kafka.consumer.services.swap-service.topic}",
+      groupId = "${spring.kafka.consumer.services.swap-service.group-id}")
+  public void onSwapEvent(ConsumerRecord<String, String> rec) {
     final String eventType = header(rec, "eventType");
     final String source = header(rec, "source");
 
     try {
       if (eventType == null) {
         log.warn(
-            "Skipping catalog event without eventType header: key={} value={}",
+            "Skipping swap event without eventType header: key={} value={}",
             rec.key(),
             rec.value());
         return;
       }
 
       switch (eventType) {
-        case "BOOK_CREATED" -> {
-          BookCreatedEvent e = objectMapper.readValue(rec.value(), BookCreatedEvent.class);
+        case "SWAP_COMPLETED" -> {
+          SwapCompletedEvent e = objectMapper.readValue(rec.value(), SwapCompletedEvent.class);
           log.info(
-              "BOOK_CREATED for userId={} emailAddress={}", e.getOwnerUserId(), e.getOwnerEmail());
-          emailService.upsertUserInfo(e.getOwnerUserId(), e.getOwnerEmail());
+              "SWAP_COMPLETED event for swapId={} requesterUserId={} responderUserId={}",
+              e.getSwapId(),
+              e.getRequesterUserId(),
+              e.getResponderUserId());
+          emailService.sendEmail(e.getSwapId(), e.getRequesterUserId(), e.getResponderUserId());
         }
         default -> {
-          log.debug("Ignored book eventType={} key={}", eventType, rec.key());
+          log.debug("Ignored swap eventType={} key={}", eventType, rec.key());
         }
       }
 

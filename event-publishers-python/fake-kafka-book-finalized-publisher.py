@@ -65,7 +65,7 @@ def main():
         "responderBookId": responder_book_id,
         # swapId will be added by the next script
     }
-    with open("swap_fixture.json", "w") as fp:
+    with open("../swap_fixture.json", "w") as fp:
         json.dump(fixture, fp, indent=2)
 
     print("Created fixture and sent BOOK_VALUATION_FINALIZED events:")
