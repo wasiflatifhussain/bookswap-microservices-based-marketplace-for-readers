@@ -39,4 +39,11 @@ public class MediaController {
   public ResponseEntity<List<MediaViewResponse>> getMediaByBookId(@PathVariable String bookId) {
     return ResponseEntity.ok(mediaService.getMediaByBookId(bookId));
   }
+
+  // Batch by media IDs
+  @PostMapping("/downloads/by-media/batch")
+  public ResponseEntity<List<MediaViewResponse>> getMediaByMediaIds(
+      @RequestBody List<String> mediaIds) {
+    return ResponseEntity.ok(mediaService.getMediaByMediaIds(mediaIds));
+  }
 }

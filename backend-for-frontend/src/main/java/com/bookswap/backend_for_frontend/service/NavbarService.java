@@ -3,7 +3,7 @@ package com.bookswap.backend_for_frontend.service;
 import com.bookswap.backend_for_frontend.client.notification.NotificationClient;
 import com.bookswap.backend_for_frontend.client.notification.dto.NotificationDto;
 import com.bookswap.backend_for_frontend.client.wallet.WalletClient;
-import com.bookswap.backend_for_frontend.client.wallet.dto.WalletBalance;
+import com.bookswap.backend_for_frontend.client.wallet.dto.WalletDto;
 import com.bookswap.backend_for_frontend.dto.response.NavbarSnapshot;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,29 +21,17 @@ public class NavbarService {
   private final WalletClient walletClient;
   private final NotificationClient notificationClient;
 
-  public WalletBalance getMyBalance() {
-    try {
-      return walletClient.getMyBalance();
-    } catch (Exception e) {
-      log.error("Error fetching wallet balance for navbar={}", e.getMessage());
-      return WalletBalance.builder()
-          .availableAmount(0.0f)
-          .reservedAmount(0.0f)
-          .message("Unable to fetch balance")
-          .build();
-    }
-  }
-
   public NavbarSnapshot getSnapshot(Authentication authentication) {
     String userEmail = currentUserEmailOrNull();
     String userId = authentication.getName();
     List<String> errors = new ArrayList<>();
 
-    WalletBalance walletBalance = null;
+    WalletDto walletDto = null;
     Integer unreadNotifications = null;
 
     try {
-      walletBalance = walletClient.getMyBalance();
+      walletDto = walletClient.getMyBalance();
+      log.info("Successfully fetched wallet balance for user={}", userId);
     } catch (Exception e) {
       log.error("Failed to fetch wallet balance for user={} with error={}", userId, e.getMessage());
       errors.add("wallet");
@@ -51,6 +39,7 @@ public class NavbarService {
 
     try {
       unreadNotifications = notificationClient.getUnreadCount();
+      log.info("Successfully fetched unread notifications count for user={}", userId);
     } catch (Exception e) {
       log.error(
           "Failed to fetch unread notifications count for userId={} with error={}",
@@ -64,8 +53,8 @@ public class NavbarService {
     return NavbarSnapshot.builder()
         .userId(userId)
         .userEmail(userEmail)
-        .walletAvailableAmount(walletBalance != null ? walletBalance.getAvailableAmount() : 0.0f)
-        .walletReservedAmount(walletBalance != null ? walletBalance.getReservedAmount() : 0.0f)
+        .walletAvailableAmount(walletDto != null ? walletDto.getAvailableAmount() : 0.0f)
+        .walletReservedAmount(walletDto != null ? walletDto.getReservedAmount() : 0.0f)
         .unreadNotificationCount(unreadNotifications != null ? unreadNotifications : 0)
         .status(status)
         .message(
@@ -77,7 +66,10 @@ public class NavbarService {
 
   public List<NotificationDto> getNotifications(boolean unreadOnly, int page, int size) {
     try {
-      return notificationClient.getNotifications(unreadOnly, page, size);
+      List<NotificationDto> notificationDtoList =
+          notificationClient.getNotifications(unreadOnly, page, size);
+      log.info("Successfully fetched {} notifications for user", notificationDtoList.size());
+      return notificationDtoList;
     } catch (Exception e) {
       log.error("Failed to fetch notifications for user with error={}", e.getMessage());
       return new ArrayList<>();
@@ -87,6 +79,7 @@ public class NavbarService {
   public void markNotificationsAsRead(List<String> unreadNotifIds) {
     try {
       notificationClient.markNotificationsAsRead(unreadNotifIds);
+      log.info("Successfully marked {} notifications as read for user", unreadNotifIds.size());
     } catch (Exception e) {
       log.error("Failed to mark notifications as read for user with error={}", e.getMessage());
     }

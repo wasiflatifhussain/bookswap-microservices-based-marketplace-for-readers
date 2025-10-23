@@ -1,6 +1,6 @@
 package com.bookswap.backend_for_frontend.client.wallet;
 
-import com.bookswap.backend_for_frontend.client.wallet.dto.WalletBalance;
+import com.bookswap.backend_for_frontend.client.wallet.dto.WalletDto;
 import com.bookswap.backend_for_frontend.config.ServiceEndpoints;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -14,12 +14,12 @@ public class WalletClient {
   }
 
   // Blocking call
-  public WalletBalance getMyBalance() {
+  public WalletDto getMyBalance() {
     return webClient
         .get()
         .uri("/api/wallet/me/balance")
         .retrieve()
-        .bodyToMono(WalletBalance.class)
+        .bodyToMono(WalletDto.class)
         .block();
   }
 }

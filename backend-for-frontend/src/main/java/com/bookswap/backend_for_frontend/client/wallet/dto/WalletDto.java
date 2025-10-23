@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class WalletBalance {
+public class WalletDto {
   private String userId;
   private Float availableAmount;
   private Float reservedAmount;

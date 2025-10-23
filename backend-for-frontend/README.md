@@ -318,3 +318,17 @@ com.bookswap.backend_for_frontend
 
 
 ---
+
+
+page shaped api layer + service layer pairs:
+home feed only has books by diff users
+my books page has only my books
+swap center has requests by me and requests to me
+add book page is for adding my books
+when click book, takes to book page
+
+- also need page or feature where user selects one of their books and gets matching books with similar valuation (
+  endpoint alrdy exists in catalog service)
+
+so yea i realized that, maybe better to make a feeditem dto and also i realized that, maybe better to fetch one image
+each from media service
