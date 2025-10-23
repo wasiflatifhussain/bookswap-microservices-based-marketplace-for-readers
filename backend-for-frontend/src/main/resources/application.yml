@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: backend-for-frontend
+  output:
+    ansi:
+      enabled: ALWAYS
+  client-endpoints:
+    catalog: http://localhost:8081
+    media: http://localhost:8082
+    wallet: http://localhost:8084
+    swap: http://localhost:8085
+    notification: http://localhost:8086
+
+http:
+  timeoutMs: 2000
+  maxInMemoryMb: 16
+
+keycloak:
+  introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
+  client-id: bookswap-backend
+  client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
+
+server:
+  port: 8080

@@ -131,7 +131,7 @@ public class NotificationService {
                       + " of valuation: "
                       + responderBookSnapshot.getValuation()
                       + " bookcoins."
-                      + "Reason: You may have deleted the request, or the responder may have accepted another book request.")
+                      + " Reason: You may have deleted the request, or the responder may have accepted another book request.")
               .build();
       notificationRepository.save(notification);
       log.info(
@@ -195,7 +195,7 @@ public class NotificationService {
                       + " of valuation: "
                       + responderBookSnapshot.getValuation()
                       + " bookcoins."
-                      + "Please wait for email notification regarding trade details.")
+                      + " Please wait for email notification regarding trade details.")
               .build();
 
       Notification responderNotification =
@@ -216,8 +216,8 @@ public class NotificationService {
                       + requesterBookSnapshot.getTitle()
                       + " of valuation: "
                       + requesterBookSnapshot.getValuation()
-                      + " bookcoins. "
-                      + "Please wait for email notification regarding trade details.")
+                      + " bookcoins."
+                      + " Please wait for email notification regarding trade details.")
               .build();
       notificationRepository.save(requesterNotification);
       log.info(
