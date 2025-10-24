@@ -1,4 +1,4 @@
-package com.bookswap.backend_for_frontend.client.wallet.dto;
+package com.bookswap.backend_for_frontend.client.wallet.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

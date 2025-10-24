@@ -115,6 +115,7 @@ public class MediaService {
       }
     }
 
+    log.info("Upload initiation completed for bookId={} with {} results", bookId, results.size());
     return new UploadInitResponse(bookId, results);
   }
 

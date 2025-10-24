@@ -1,10 +1,10 @@
 package com.bookswap.backend_for_frontend.service;
 
 import com.bookswap.backend_for_frontend.client.notification.NotificationClient;
-import com.bookswap.backend_for_frontend.client.notification.dto.NotificationDto;
+import com.bookswap.backend_for_frontend.client.notification.dto.response.NotificationDto;
 import com.bookswap.backend_for_frontend.client.wallet.WalletClient;
-import com.bookswap.backend_for_frontend.client.wallet.dto.WalletDto;
-import com.bookswap.backend_for_frontend.dto.response.NavbarSnapshot;
+import com.bookswap.backend_for_frontend.client.wallet.dto.response.WalletDto;
+import com.bookswap.backend_for_frontend.dto.navbar.response.NavbarSnapshotDto;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +21,7 @@ public class NavbarService {
   private final WalletClient walletClient;
   private final NotificationClient notificationClient;
 
-  public NavbarSnapshot getSnapshot(Authentication authentication) {
+  public NavbarSnapshotDto getSnapshot(Authentication authentication) {
     String userEmail = currentUserEmailOrNull();
     String userId = authentication.getName();
     List<String> errors = new ArrayList<>();
@@ -50,7 +50,7 @@ public class NavbarService {
 
     String status = errors.isEmpty() ? "OK" : (errors.size() == 1 ? "PARTIAL" : "FAILED");
 
-    return NavbarSnapshot.builder()
+    return NavbarSnapshotDto.builder()
         .userId(userId)
         .userEmail(userEmail)
         .walletAvailableAmount(walletDto != null ? walletDto.getAvailableAmount() : 0.0f)

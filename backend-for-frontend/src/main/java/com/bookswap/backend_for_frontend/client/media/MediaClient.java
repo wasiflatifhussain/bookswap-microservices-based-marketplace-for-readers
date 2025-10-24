@@ -1,6 +1,9 @@
 package com.bookswap.backend_for_frontend.client.media;
 
-import com.bookswap.backend_for_frontend.client.media.dto.MediaViewDto;
+import com.bookswap.backend_for_frontend.client.media.dto.request.UploadInitRequestDto;
+import com.bookswap.backend_for_frontend.client.media.dto.response.MediaViewDto;
+import com.bookswap.backend_for_frontend.client.media.dto.response.UploadConfirmDto;
+import com.bookswap.backend_for_frontend.client.media.dto.response.UploadInitResponseDto;
 import com.bookswap.backend_for_frontend.config.ServiceEndpoints;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -22,6 +25,27 @@ public class MediaClient {
         .retrieve()
         .bodyToFlux(MediaViewDto.class)
         .collectList()
+        .block();
+  }
+
+  public UploadInitResponseDto initializeUpload(
+      UploadInitRequestDto uploadInitRequestDto, String bookId) {
+    return webClient
+        .post()
+        .uri("/api/media/uploads/{bookId}/init", bookId)
+        .bodyValue(uploadInitRequestDto)
+        .retrieve()
+        .bodyToMono(UploadInitResponseDto.class)
+        .block();
+  }
+
+  public UploadConfirmDto confirmUpload(String bookId, List<String> mediaIds) {
+    return webClient
+        .post()
+        .uri("/api/media/uploads/{bookId}/complete", bookId)
+        .bodyValue(mediaIds)
+        .retrieve()
+        .bodyToMono(UploadConfirmDto.class)
         .block();
   }
 }

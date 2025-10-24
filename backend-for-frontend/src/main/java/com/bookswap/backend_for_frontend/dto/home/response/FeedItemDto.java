@@ -1,4 +1,4 @@
-package com.bookswap.backend_for_frontend.client.catalog.dto;
+package com.bookswap.backend_for_frontend.dto.home.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

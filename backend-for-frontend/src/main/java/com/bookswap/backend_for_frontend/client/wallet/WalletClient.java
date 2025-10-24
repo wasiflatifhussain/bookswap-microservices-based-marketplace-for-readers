@@ -1,6 +1,6 @@
 package com.bookswap.backend_for_frontend.client.wallet;
 
-import com.bookswap.backend_for_frontend.client.wallet.dto.WalletDto;
+import com.bookswap.backend_for_frontend.client.wallet.dto.response.WalletDto;
 import com.bookswap.backend_for_frontend.config.ServiceEndpoints;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;

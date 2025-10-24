@@ -1,6 +1,6 @@
 package com.bookswap.backend_for_frontend.client.notification;
 
-import com.bookswap.backend_for_frontend.client.notification.dto.NotificationDto;
+import com.bookswap.backend_for_frontend.client.notification.dto.response.NotificationDto;
 import com.bookswap.backend_for_frontend.config.ServiceEndpoints;
 import java.util.List;
 import org.springframework.stereotype.Component;

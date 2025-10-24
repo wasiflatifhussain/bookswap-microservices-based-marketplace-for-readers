@@ -1,4 +1,4 @@
-package com.bookswap.backend_for_frontend.dto.response;
+package com.bookswap.backend_for_frontend.dto.navbar.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class NavbarSnapshot {
+public class NavbarSnapshotDto {
   private String userId;
   private String userEmail;
   private Float walletAvailableAmount;

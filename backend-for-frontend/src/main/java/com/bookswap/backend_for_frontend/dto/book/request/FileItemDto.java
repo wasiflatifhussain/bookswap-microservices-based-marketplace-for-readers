@@ -1,4 +1,4 @@
-package com.bookswap.backend_for_frontend.client.media.dto;
+package com.bookswap.backend_for_frontend.dto.book.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,8 +9,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class MediaViewDto {
-  private String mediaId;
+public class FileItemDto {
+  private String clientRef;
+  private String name;
+  private long sizeBytes;
   private String mimeType;
-  private String presignedUrl;
 }

@@ -1,10 +1,10 @@
 package com.bookswap.backend_for_frontend.service;
 
 import com.bookswap.backend_for_frontend.client.catalog.CatalogClient;
-import com.bookswap.backend_for_frontend.client.catalog.dto.BookDto;
-import com.bookswap.backend_for_frontend.client.catalog.dto.FeedItemDto;
+import com.bookswap.backend_for_frontend.client.catalog.dto.response.BookDto;
 import com.bookswap.backend_for_frontend.client.media.MediaClient;
-import com.bookswap.backend_for_frontend.client.media.dto.MediaViewDto;
+import com.bookswap.backend_for_frontend.client.media.dto.response.MediaViewDto;
+import com.bookswap.backend_for_frontend.dto.home.response.FeedItemDto;
 import java.util.*;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

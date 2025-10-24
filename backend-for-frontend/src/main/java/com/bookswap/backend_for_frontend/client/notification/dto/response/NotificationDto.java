@@ -1,4 +1,4 @@
-package com.bookswap.backend_for_frontend.client.notification.dto;
+package com.bookswap.backend_for_frontend.client.notification.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

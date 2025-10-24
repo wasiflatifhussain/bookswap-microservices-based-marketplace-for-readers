@@ -1,7 +1,7 @@
 package com.bookswap.backend_for_frontend.api;
 
-import com.bookswap.backend_for_frontend.client.notification.dto.NotificationDto;
-import com.bookswap.backend_for_frontend.dto.response.NavbarSnapshot;
+import com.bookswap.backend_for_frontend.client.notification.dto.response.NotificationDto;
+import com.bookswap.backend_for_frontend.dto.navbar.response.NavbarSnapshotDto;
 import com.bookswap.backend_for_frontend.service.NavbarService;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -19,8 +19,8 @@ public class NavbarController {
   private final NavbarService navbarService;
 
   @GetMapping("/snapshot")
-  public ResponseEntity<NavbarSnapshot> snapshot(Authentication authentication) {
-    NavbarSnapshot snapshot = navbarService.getSnapshot(authentication);
+  public ResponseEntity<NavbarSnapshotDto> snapshot(Authentication authentication) {
+    NavbarSnapshotDto snapshot = navbarService.getSnapshot(authentication);
     return switch (snapshot.getStatus()) {
       case "OK" -> ResponseEntity.ok(snapshot);
       case "PARTIAL" -> ResponseEntity.status(206).body(snapshot);

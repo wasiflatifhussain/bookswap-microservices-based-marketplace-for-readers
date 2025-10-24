@@ -1,6 +1,6 @@
 package com.bookswap.backend_for_frontend.api;
 
-import com.bookswap.backend_for_frontend.client.catalog.dto.FeedItemDto;
+import com.bookswap.backend_for_frontend.dto.home.response.FeedItemDto;
 import com.bookswap.backend_for_frontend.service.HomeFeedService;
 import java.util.List;
 import lombok.AllArgsConstructor;

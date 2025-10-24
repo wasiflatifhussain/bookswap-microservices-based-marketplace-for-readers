@@ -1,6 +1,5 @@
-package com.bookswap.backend_for_frontend.client.catalog.dto;
+package com.bookswap.backend_for_frontend.dto.book.request;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,18 +10,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class BookDto {
-  private String bookId;
+public class CreateBookDto {
   private String title;
   private String description;
   private String genre;
   private String author;
   private String bookCondition;
   private Float valuation;
-  private String bookStatus;
   private List<String> mediaIds;
-  private String ownerUserId;
-  private LocalDateTime createdAt;
-  private LocalDateTime updatedAt;
-  private String message;
+  private List<FileItemDto> files;
 }

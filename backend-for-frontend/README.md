@@ -332,3 +332,12 @@ when click book, takes to book page
 
 so yea i realized that, maybe better to make a feeditem dto and also i realized that, maybe better to fetch one image
 each from media service
+
+add book page on frontend:
+User clicks Add Book
+Frontend → BFF: sends create init request
+BFF: creates book in Catalog, calls Media Service, gets presigned URLs, returns them to FE
+Frontend: uploads images directly to storage via PUT using those URLs
+Frontend → BFF: sends complete upload request after uploads finish
+BFF: confirms upload with Media Service and finalizes creation
+Frontend: receives success response and redirects to the book page
