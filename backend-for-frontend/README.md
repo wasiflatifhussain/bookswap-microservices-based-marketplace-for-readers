@@ -2,7 +2,7 @@
 
 ## 0) Session & Navbar
 
-### GET `/bff/me`
+### GET `/api/bff/navbar/snapshot`
 
 **Purpose:** navbar snapshot (user, wallet, unread notifications)
 
@@ -13,7 +13,7 @@
 
 ## 1) Home Feed
 
-### GET `/bff/feed/recent?limit=&cursor=`
+### GET `/api/bff/home/feed?limit=`
 
 **Purpose:** homepage cards (title, author, valuation, primary thumbnail)
 
@@ -26,7 +26,7 @@
 
 ## 2) Book Details
 
-### GET `/bff/books/{bookId}`
+### GET `/api/bff/books/get/{bookId}`
 
 **Purpose:** one book’s full page (all images, valuation, description)
 
@@ -39,7 +39,7 @@
 
 ## 3) My Books
 
-### GET `/bff/me/books?limit=&cursor=`
+### GET `/api/bff/books/me/get`
 
 **Purpose:** list my books (+ primary thumbnail)
 
@@ -48,7 +48,7 @@
 1. `GET /api/catalog/books/user/{userId}` (Catalog)
 2. `POST /api/media/view-urls:batch` (Media; with mediaIds from 1)
 
-### DELETE `/bff/me/books/{bookId}`
+### DELETE `/api/bff/books/me/delete/{bookId}`
 
 **Purpose:** unlist a book (if not reserved)
 
@@ -61,7 +61,7 @@
 
 ## 4) Add a Book (orchestrated but thin)
 
-### POST `/bff/me/books`
+### POST `/api/bff/books/create/init`
 
 **Purpose:** create book metadata (DRAFT)
 
@@ -69,15 +69,7 @@
 
 1. `POST /api/catalog/books` (Catalog)
 
-### POST `/bff/me/books/{bookId}/uploads:init`
-
-**Purpose:** get presigned PUT URLs
-
-**Downstream (order):**
-
-1. `POST /api/media/uploads/{bookId}/init` (Media)
-
-### POST `/bff/me/books/{bookId}/uploads:complete`
+### POST `/api/bff/books/create/complete`
 
 **Purpose:** finalize uploaded objects
 
@@ -147,15 +139,15 @@
 
 ## 6) Notifications (navbar + page)
 
-### GET `/bff/notifications/unread-count`
+### GET `/api/bff/navbar/snapshot`
 
-**Purpose:** navbar badge
+**Purpose:** navbar badge (includes unread count)
 
 **Downstream (order):**
 
 1. `GET /api/notifications/unread-count` (Notification)
 
-### GET `/bff/notifications?unreadOnly=&page=&size=`
+### GET `/api/bff/navbar/notifications?unreadOnly=&page=&size=`
 
 **Purpose:** list notifications
 
@@ -163,7 +155,7 @@
 
 1. `GET /api/notifications/get?unreadOnly=&page=&size=` (Notification)
 
-### POST `/bff/notifications/read`
+### POST `/api/bff/navbar/notifications/read`
 
 **Purpose:** mark some/all as read
 
@@ -244,8 +236,6 @@
 
 **Tiny example (Java records)**
 
-*Public BFF DTOs*
-
 ```java
 public record FeedItemDto(String bookId, String title, String author,
                           String condition, ValuationDto valuation,
@@ -255,8 +245,6 @@ public record FeedItemDto(String bookId, String title, String author,
 public record ValuationDto(double coins, double confidence) {
 }
 ```
-
-*Downstream client DTOs (per service)*
 
 ```java
 // catalog client
@@ -269,8 +257,6 @@ record CatalogRecentBook(String bookId, String title, String author,
 record MediaViewUrl(String mediaId, String url, Instant expiresAt) {
 }
 ```
-
-*Mapper (sketch)*
 
 ```java
 FeedItemDto toFeedItem(CatalogRecentBook b, Map<String, MediaViewUrl> mediaMap) {
@@ -286,7 +272,7 @@ FeedItemDto toFeedItem(CatalogRecentBook b, Map<String, MediaViewUrl> mediaMap) 
 
 ---
 
-
+```
 com.bookswap.backend_for_frontend
 ├─ api/ # controllers
 │ ├─ MeController.java
@@ -311,10 +297,9 @@ com.bookswap.backend_for_frontend
 ├─ mapper/ # maps client DTOs -> BFF DTOs
 │ └─ ...
 └─ config/ # security, cors, webclient, properties
-
+```
 
 ---
-
 
 page shaped api layer + service layer pairs:
 home feed only has books by diff users
@@ -323,7 +308,7 @@ swap center has requests by me and requests to me
 add book page is for adding my books
 when click book, takes to book page
 
-- also need page or feature where user selects one of their books and gets matching books with similar valuation (
+* also need page or feature where user selects one of their books and gets matching books with similar valuation (
   endpoint alrdy exists in catalog service)
 
 so yea i realized that, maybe better to make a feeditem dto and also i realized that, maybe better to fetch one image
@@ -337,3 +322,26 @@ Frontend: uploads images directly to storage via PUT using those URLs
 Frontend → BFF: sends complete upload request after uploads finish
 BFF: confirms upload with Media Service and finalizes creation
 Frontend: receives success response and redirects to the book page
+
+---
+
+## Checklist
+
+**Done**
+
+* [x] `GET /api/bff/navbar/snapshot`
+* [x] `GET /api/bff/home/feed?limit=`
+* [x] `GET /api/bff/books/get/{bookId}`
+* [x] `GET /api/bff/books/matches/{bookId}?tolerance=`
+* [x] `GET /api/bff/books/me/get`
+* [x] `DELETE /api/bff/books/me/delete/{bookId}`
+* [x] `POST /api/bff/books/create/init`
+* [x] `POST /api/bff/books/create/complete`
+* [x] `GET /api/bff/navbar/notifications?unreadOnly=&page=&size=`
+* [x] `POST /api/bff/navbar/notifications/read`
+
+**Pending**
+
+* [ ] Swap Center endpoints (`/bff/me/swaps/*`, `/bff/swaps/*`) per design above
+* [ ] Wallet quick fetch endpoint (`/bff/wallet/balance`) if you want a dedicated BFF route (snapshot already fetches
+  balance for navbar)

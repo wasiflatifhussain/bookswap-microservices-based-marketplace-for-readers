@@ -60,4 +60,23 @@ public class CatalogClient {
         .collectList()
         .block();
   }
+
+  public List<BookDto> getMyBooks(String userId) {
+    return webClient
+        .get()
+        .uri("/api/catalog/books/user/{userId}", userId)
+        .retrieve()
+        .bodyToFlux(BookDto.class)
+        .collectList()
+        .block();
+  }
+
+  public String deleteBook(String bookId) {
+    return webClient
+        .delete()
+        .uri("/api/catalog/books/{bookId}", bookId)
+        .retrieve()
+        .bodyToMono(String.class)
+        .block();
+  }
 }

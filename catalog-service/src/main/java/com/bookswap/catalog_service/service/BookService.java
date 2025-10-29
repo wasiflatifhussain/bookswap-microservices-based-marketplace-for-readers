@@ -102,14 +102,23 @@ public class BookService {
   }
 
   @Transactional
-  public String deleteBookByBookId(String bookId) {
+  public String deleteBookByBookId(String bookId, String userId) {
     log.info("Initiating deletion for book by bookId={}", bookId);
     try {
-      Optional<Book> bookOpt = bookRepository.findByBookId(bookId);
+      Optional<Book> bookOpt = bookRepository.findByBookIdAndOwnerUserId(bookId, userId);
       if (bookOpt.isEmpty()) {
-        return "ERROR: Book not found";
+        log.warn("Delete denied: not found or not owner. bookId={}, userId={}", bookId, userId);
+        return "ERROR: Not authorized to delete this book";
       }
+
+      // Prevent deletion if book is RESERVED
       Book book = bookOpt.get();
+
+      if (book.getBookStatus() == BookStatus.RESERVED) {
+        log.warn("Attempted to delete reserved book with bookId={}", bookId);
+        return "ERROR: Book is currently reserved and cannot be deleted";
+      }
+
       bookRepository.deleteByBookId(bookId);
 
       BookUnlistedEvent unlistedEvent =
@@ -153,7 +162,8 @@ public class BookService {
 
   @Transactional(readOnly = true)
   public BookDetailedResponse[] getMatchingBooks(String bookId, double tolerance) {
-    log.info("Initiating search for matching books for bookId={} with tolerance={}", bookId, tolerance);
+    log.info(
+        "Initiating search for matching books for bookId={} with tolerance={}", bookId, tolerance);
     try {
       Optional<Book> myBookOpt = bookRepository.findByBookId(bookId);
       if (myBookOpt.isEmpty()) {

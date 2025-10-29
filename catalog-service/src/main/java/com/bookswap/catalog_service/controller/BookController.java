@@ -41,8 +41,9 @@ public class BookController {
   }
 
   @DeleteMapping("/books/{bookId}")
-  public ResponseEntity<String> deleteBookByBookId(@PathVariable String bookId) {
-    return ResponseEntity.ok(bookService.deleteBookByBookId(bookId));
+  public ResponseEntity<String> deleteBookByBookId(
+      @PathVariable String bookId, Authentication authentication) {
+    return ResponseEntity.ok(bookService.deleteBookByBookId(bookId, authentication.getName()));
   }
 
   @GetMapping("/books/recent")
@@ -75,7 +76,8 @@ public class BookController {
   }
 
   @PostMapping("/books/confirm/swap")
-  public ResponseEntity<Boolean> confirmSwap(@RequestParam String requesterBookId, @RequestParam String responderBookId) {
+  public ResponseEntity<Boolean> confirmSwap(
+      @RequestParam String requesterBookId, @RequestParam String responderBookId) {
     return ResponseEntity.ok(bookService.confirmSwap(requesterBookId, responderBookId));
   }
 }

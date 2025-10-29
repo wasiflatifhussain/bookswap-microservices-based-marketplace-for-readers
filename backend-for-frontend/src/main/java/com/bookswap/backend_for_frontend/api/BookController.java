@@ -10,6 +10,8 @@ import com.bookswap.backend_for_frontend.service.BookService;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,24 +26,35 @@ public class BookController {
    * return presigned URLs to client.
    */
   @PostMapping("/create/init")
-  public UploadInitResponseDto createBook(@RequestBody CreateBookDto createBookRequestDto) {
-    return bookService.createBook(createBookRequestDto);
+  public ResponseEntity<UploadInitResponseDto> createBook(
+      @RequestBody CreateBookDto createBookRequestDto) {
+    return ResponseEntity.ok(bookService.createBook(createBookRequestDto));
   }
 
   @PostMapping("/create/complete")
-  public CompletionConfirmDto completeBookCreation(
+  public ResponseEntity<CompletionConfirmDto> completeBookCreation(
       @RequestBody UploadCompleteRequestDto uploadCompleteRequestDto) {
-    return bookService.completeBookCreation(uploadCompleteRequestDto);
+    return ResponseEntity.ok(bookService.completeBookCreation(uploadCompleteRequestDto));
   }
 
   @GetMapping("/get/{bookId}")
-  public CompleteBookDto getBookById(@PathVariable String bookId) {
-    return bookService.getBookById(bookId);
+  public ResponseEntity<CompleteBookDto> getBookById(@PathVariable String bookId) {
+    return ResponseEntity.ok(bookService.getBookById(bookId));
   }
 
   @GetMapping("/matches/{bookId}")
-  public List<BookCardDto> getMatchingBooks(
+  public ResponseEntity<List<BookCardDto>> getMatchingBooks(
       @PathVariable String bookId, @RequestParam(defaultValue = "0.15") double tolerance) {
-    return bookService.getMatchingBooks(bookId, tolerance);
+    return ResponseEntity.ok(bookService.getMatchingBooks(bookId, tolerance));
+  }
+
+  @GetMapping("/me/get")
+  public ResponseEntity<List<BookCardDto>> getMyBooks(Authentication authentication) {
+    return ResponseEntity.ok(bookService.getMyBooks(authentication.getName()));
+  }
+
+  @DeleteMapping("/me/delete/{bookId}")
+  public ResponseEntity<String> deleteMyBook(@PathVariable String bookId) {
+    return ResponseEntity.ok(bookService.deleteMyBook(bookId));
   }
 }

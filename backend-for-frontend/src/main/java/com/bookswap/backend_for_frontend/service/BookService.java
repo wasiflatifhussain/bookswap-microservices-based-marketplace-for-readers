@@ -187,4 +187,90 @@ public class BookService {
       return Collections.emptyList();
     }
   }
+
+  public List<BookCardDto> getMyBooks(String userId) {
+    try {
+      List<BookDto> myBooks = catalogClient.getMyBooks(userId);
+      if (myBooks == null) myBooks = List.of();
+      log.info("Fetched {} books for the current user", myBooks.size());
+
+      Map<String, String> bookToPrimaryMediaId = new LinkedHashMap<>();
+      for (BookDto b : myBooks) {
+        List<String> ids = b.getMediaIds();
+        if (ids != null && !ids.isEmpty()) {
+          bookToPrimaryMediaId.put(b.getBookId(), ids.get(0));
+        } else {
+          bookToPrimaryMediaId.put(b.getBookId(), null);
+        }
+      }
+
+      // Dedup primary media IDs for calling media service
+      List<String> primaryMediaIds =
+          bookToPrimaryMediaId.values().stream().filter(Objects::nonNull).distinct().toList();
+
+      // Batch call Media to get presigned URLs (best-effort)
+      Map<String, String> mediaIdToUrl = new HashMap<>();
+      try {
+        if (!primaryMediaIds.isEmpty()) {
+          List<MediaViewDto> mediaViews = mediaClient.getViewUrlsByMediaIds(primaryMediaIds);
+          if (mediaViews != null) {
+            for (MediaViewDto mv : mediaViews) {
+              if (mv != null && mv.getMediaId() != null && mv.getPresignedUrl() != null) {
+                mediaIdToUrl.put(mv.getMediaId(), mv.getPresignedUrl());
+              }
+            }
+            log.info("Successfully fetched {} media view URLs", mediaIdToUrl.size());
+          }
+        }
+      } catch (Exception me) {
+        log.warn("Media batch fetch failed (continuing without thumbnails): {}", me.getMessage());
+      }
+
+      // 5) Map each BookDto -> BookCardDto, attaching the corresponding thumbnail URL
+      List<BookCardDto> bookCardDtoList = new ArrayList<>(myBooks.size());
+      for (BookDto b : myBooks) {
+        String primaryMediaId = bookToPrimaryMediaId.get(b.getBookId());
+        String thumbnailUrl = (primaryMediaId == null) ? null : mediaIdToUrl.get(primaryMediaId);
+
+        BookCardDto item =
+            BookCardDto.builder()
+                .bookId(b.getBookId())
+                .title(b.getTitle())
+                .description(b.getDescription())
+                .genre(b.getGenre())
+                .author(b.getAuthor())
+                .bookCondition(b.getBookCondition())
+                .valuation(b.getValuation())
+                .bookStatus(b.getBookStatus())
+                .thumbnailUrl(thumbnailUrl)
+                .build();
+
+        bookCardDtoList.add(item);
+      }
+
+      log.info("Mapped user's books to BookCardDto");
+      return bookCardDtoList;
+    } catch (Exception e) {
+      log.error("Error fetching user's books with message={}", e.getMessage());
+      return Collections.emptyList();
+    }
+  }
+
+  public String deleteMyBook(String bookId) {
+    try {
+      String response = catalogClient.deleteBook(bookId);
+
+      // Check if response message says SUCCESS or ERROR:....
+      if (response != null && response.startsWith("ERROR:")) {
+        log.error("Failed to delete book with id={} message={}", bookId, response);
+        return "Failed to delete book with id=" + bookId + " message=" + response;
+      }
+
+      log.info("Deleted book with id={}", bookId);
+      return response;
+    } catch (Exception e) {
+      log.error("Error deleting book with id={} message={}", bookId, e.getMessage());
+      return "Failed to delete book with id=" + bookId;
+    }
+  }
 }
