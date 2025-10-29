@@ -48,4 +48,14 @@ public class MediaClient {
         .bodyToMono(UploadConfirmDto.class)
         .block();
   }
+
+  public List<MediaViewDto> getMediaByBookId(String bookId) {
+    return webClient
+        .get()
+        .uri("/api/media/downloads/{bookId}/view", bookId)
+        .retrieve()
+        .bodyToFlux(MediaViewDto.class)
+        .collectList()
+        .block();
+  }
 }

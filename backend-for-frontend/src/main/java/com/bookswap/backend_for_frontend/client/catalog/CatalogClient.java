@@ -35,4 +35,29 @@ public class CatalogClient {
         .bodyToMono(BookSimpleDto.class)
         .block();
   }
+
+  public BookDto getBookById(String bookId) {
+    return webClient
+        .get()
+        .uri("/api/catalog/books/{bookId}", bookId)
+        .retrieve()
+        .bodyToMono(BookDto.class)
+        .block();
+  }
+
+  public List<BookDto> getMatchingBooks(String bookId, double tolerance) {
+    return webClient
+        .get()
+        .uri(
+            uriBuilder ->
+                uriBuilder
+                    .path("/api/catalog/books/matches")
+                    .queryParam("book-id", bookId)
+                    .queryParam("tolerance", tolerance)
+                    .build())
+        .retrieve()
+        .bodyToFlux(BookDto.class)
+        .collectList()
+        .block();
+  }
 }

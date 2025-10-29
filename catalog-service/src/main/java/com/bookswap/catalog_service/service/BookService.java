@@ -153,6 +153,7 @@ public class BookService {
 
   @Transactional(readOnly = true)
   public BookDetailedResponse[] getMatchingBooks(String bookId, double tolerance) {
+    log.info("Initiating search for matching books for bookId={} with tolerance={}", bookId, tolerance);
     try {
       Optional<Book> myBookOpt = bookRepository.findByBookId(bookId);
       if (myBookOpt.isEmpty()) {
@@ -169,10 +170,12 @@ public class BookService {
           bookRepository.findMatchingBooks(
               BookStatus.AVAILABLE, bookId, minVal, maxVal, PageRequest.of(0, 20));
       if (matches.isEmpty()) {
+        log.info("No matching books found for bookId={}", bookId);
         return new BookDetailedResponse[] {
           BookDetailedResponse.builder().message("No matching books found").build()
         };
       }
+      log.info("Found {} matching books for bookId={}", matches.size(), bookId);
       return matches.stream().map(this::mapBookToDetailedBook).toArray(BookDetailedResponse[]::new);
     } catch (Exception e) {
       log.error("Error while fetching matching books", e);

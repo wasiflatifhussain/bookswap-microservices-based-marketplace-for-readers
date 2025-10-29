@@ -1,5 +1,3 @@
----
-
 # BFF: Public Endpoints (only what the client uses)
 
 ## 0) Session & Navbar
@@ -12,8 +10,6 @@
 
 1. `GET /api/wallet/me/balance` (Wallet)
 2. `GET /api/notifications/unread-count` (Notification)
-
----
 
 ## 1) Home Feed
 
