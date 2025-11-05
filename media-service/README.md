@@ -5,7 +5,7 @@ The S3 User we are currently using is set to have access permission of Local Cod
 When using the code in Prod, change the S3 User to the one that has access permission of Prod Code.
 
 under main file runner, add config:
-AWS_ACCESS_KEY=<your-aws-access-key>; AWS_SECRE_ACCESS_KEY=<your-aws-secret-access-key>; S3_BUCKET_NAME=<
+AWS_ACCESS_KEY=<your-aws-access-key>; AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>; S3_BUCKET_NAME=<
 your-s3-bucket-name>;
 
 # to dos:

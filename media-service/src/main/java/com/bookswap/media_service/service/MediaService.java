@@ -115,6 +115,7 @@ public class MediaService {
       }
     }
 
+    log.info("Upload initiation completed for bookId={} with {} results", bookId, results.size());
     return new UploadInitResponse(bookId, results);
   }
 
@@ -253,6 +254,55 @@ public class MediaService {
 
     } catch (Exception e) {
       log.error("Error fetching media for bookId={}:", bookId, e);
+      return List.of();
+    }
+  }
+
+  @Transactional(readOnly = true)
+  public List<MediaViewResponse> getMediaByMediaIds(List<String> mediaIds) {
+    if (mediaIds == null || mediaIds.isEmpty()) {
+      log.info("Empty mediaIds list provided");
+      return List.of();
+    }
+
+    try {
+      List<Media> mediaList =
+          mediaRepository.findAllById(mediaIds).stream()
+              .filter(m -> m.getStatus() == Status.STORED)
+              .toList();
+
+      if (mediaList.isEmpty()) {
+        log.info("No stored media found for IDs={}", mediaIds);
+        return List.of();
+      }
+
+      Duration ttl = Duration.ofMinutes(downloadTtlMinutes);
+      OffsetDateTime expiresAt = OffsetDateTime.now().plus(ttl);
+
+      return mediaList.stream()
+          .map(
+              media -> {
+                try {
+                  URL presignedUrl = s3PresignService.presignGetUrl(media.getObjectKey(), ttl);
+                  log.info(
+                      "Generated presigned URL for mediaId={} (expires at {})",
+                      media.getMediaId(),
+                      expiresAt);
+                  return MediaViewResponse.builder()
+                      .mediaId(media.getMediaId())
+                      .mimeType(media.getMimeType())
+                      .presignedUrl(presignedUrl.toString())
+                      .build();
+                } catch (Exception e) {
+                  log.warn("Presign failed for mediaId={}:", media.getMediaId(), e);
+                  return null;
+                }
+              })
+          .filter(Objects::nonNull)
+          .toList();
+
+    } catch (Exception e) {
+      log.error("Error fetching media for IDs={}", mediaIds, e);
       return List.of();
     }
   }
