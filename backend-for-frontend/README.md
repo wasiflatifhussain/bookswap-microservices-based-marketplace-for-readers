@@ -1,347 +1,193 @@
-# BFF: Public Endpoints (only what the client uses)
+# **BookSwap BFF – Public API**
 
-## 0) Session & Navbar
-
-### GET `/api/bff/navbar/snapshot`
-
-**Purpose:** navbar snapshot (user, wallet, unread notifications)
-
-**Downstream (order):**
-
-1. `GET /api/wallet/me/balance` (Wallet)
-2. `GET /api/notifications/unread-count` (Notification)
-
-## 1) Home Feed
-
-### GET `/api/bff/home/feed?limit=`
-
-**Purpose:** homepage cards (title, author, valuation, primary thumbnail)
-
-**Downstream (order):**
-
-1. `GET /api/catalog/books/recent?limit=` (Catalog)
-2. `POST /api/media/view-urls:batch` (Media; with mediaIds from 1)
+**Base path:** `/api/bff`
+The BFF connects the frontend with Catalog, Media, Swap, Wallet, and Notification services — orchestrating requests and
+shaping unified responses.
 
 ---
 
-## 2) Book Details
+## **0) Navbar & Session**
 
-### GET `/api/bff/books/get/{bookId}`
+### `GET /navbar/snapshot`
 
-**Purpose:** one book’s full page (all images, valuation, description)
+**Purpose:** Get user snapshot — wallet balance, unread notifications, status.
+**Auth:** Required
+**Downstream:**
 
-**Downstream (order):**
-
-1. `GET /api/catalog/books/{bookId}` (Catalog)
-2. `POST /api/media/view-urls:batch` (Media; with mediaIds from 1)
-
----
-
-## 3) My Books
-
-### GET `/api/bff/books/me/get`
-
-**Purpose:** list my books (+ primary thumbnail)
-
-**Downstream (order):**
-
-1. `GET /api/catalog/books/user/{userId}` (Catalog)
-2. `POST /api/media/view-urls:batch` (Media; with mediaIds from 1)
-
-### DELETE `/api/bff/books/me/delete/{bookId}`
-
-**Purpose:** unlist a book (if not reserved)
-
-**Downstream (order):**
-
-1. `DELETE /api/catalog/books/{bookId}` (Catalog)
-   *(Catalog/Swap/Wallet side-effects happen via their own flows/events; BFF just forwards the result)*
+1. `GET /wallet/me/balance`
+2. `GET /notifications/unread-count`
 
 ---
 
-## 4) Add a Book (orchestrated but thin)
+### `GET /navbar/notifications?unreadOnly=&page=&size=`
 
-### POST `/api/bff/books/create/init`
-
-**Purpose:** create book metadata (DRAFT)
-
-**Downstream (order):**
-
-1. `POST /api/catalog/books` (Catalog)
-
-### POST `/api/bff/books/create/complete`
-
-**Purpose:** finalize uploaded objects
-
-**Downstream (order):**
-
-1. `POST /api/media/uploads/{bookId}/complete` (Media)
+**Purpose:** Fetch paginated notifications for current user.
+**Params:** `unreadOnly` (default `false`), `page` (default `0`), `size` (default `20`)
+**Downstream:** `GET /notifications/get?unreadOnly=&page=&size=`
 
 ---
 
-## 5) Swap Center
+### `POST /navbar/notifications/read`
 
-### GET `/bff/me/swaps/sent?status=&cursor=`
-
-**Purpose:** list swaps I sent (enriched with book cards)
-
-**Downstream (order):**
-
-1. `GET /api/swaps/sent?userId=&status=` (Swap)
-2. `POST /api/catalog/books/bulk` (Catalog; with all bookIds from 1)
-3. `POST /api/media/view-urls:batch` (Media; with mediaIds from 2)
-
-### GET `/bff/me/swaps/received?status=&cursor=`
-
-**Purpose:** list swaps I received (enriched)
-
-**Downstream (order):**
-
-1. `GET /api/swaps/received?userId=&status=` (Swap)
-2. `POST /api/catalog/books/bulk` (Catalog)
-3. `POST /api/media/view-urls:batch` (Media)
-
-### POST `/bff/swaps`
-
-**Purpose:** create swap request
-
-**Downstream (order):**
-
-1. `POST /swap/requests` (Swap)
-
-### POST `/bff/swaps/{swapId}/cancel`
-
-**Purpose:** requester cancels
-
-**Downstream (order):**
-
-1. `POST /swap/requests/{swapId}/cancel` (Swap)
-
-### POST `/bff/swaps/{swapId}/decline`
-
-**Purpose:** responder declines
-
-**Downstream (order):**
-
-1. `POST /swap/requests/{swapId}/decline` (Swap)
-
-### POST `/bff/swaps/{swapId}/accept`
-
-**Purpose:** responder accepts → swap completion
-
-**Downstream (order):**
-
-1. `POST /swap/requests/{swapId}/accept` (Swap)
-2. *(Optional enrich after success)* `POST /api/catalog/books/bulk` + `POST /api/media/view-urls:batch` to return nice
-   UI payload
+**Purpose:** Mark notifications as read.
+**Body:** `["notif-id-1", "notif-id-2", ...]`
+**Downstream:** `POST /notifications/read`
+**Response:** `204 No Content`
 
 ---
 
-## 6) Notifications (navbar + page)
+## **1) Home Feed**
 
-### GET `/api/bff/navbar/snapshot`
+### `GET /home/feed?limit=`
 
-**Purpose:** navbar badge (includes unread count)
+**Purpose:** Get homepage book cards (title, author, valuation, thumbnail).
+**Param:** `limit` (default `20`)
+**Downstream:**
 
-**Downstream (order):**
-
-1. `GET /api/notifications/unread-count` (Notification)
-
-### GET `/api/bff/navbar/notifications?unreadOnly=&page=&size=`
-
-**Purpose:** list notifications
-
-**Downstream (order):**
-
-1. `GET /api/notifications/get?unreadOnly=&page=&size=` (Notification)
-
-### POST `/api/bff/navbar/notifications/read`
-
-**Purpose:** mark some/all as read
-
-**Downstream (order):**
-
-1. `POST /api/notifications/read` (Notification)
+1. `GET /catalog/books/recent?limit=`
+2. `POST /media/view-urls:batch`
 
 ---
 
-## 7) Wallet (navbar quick fetch)
+## **2) Books**
 
-### GET `/bff/wallet/balance`
+### `GET /books/get/{bookId}`
 
-**Purpose:** show BookCoins balance
+**Purpose:** Get full details of a single book (description, valuation, images).
+**Downstream:**
 
-**Downstream (order):**
-
-1. `GET /api/wallet/me/balance` (Wallet)
-
----
-
-# Execution Notes (orders & policies)
-
-* **Token Relay everywhere**: BFF validates the JWT and forwards the same `Authorization: Bearer …` to every downstream.
-* **Timeouts & retries**: Reads (Catalog/Media/Notif/Wallet) 1–2s timeouts + 1 retry with jitter; writes (Swap
-  create/accept/cancel, Catalog delete) no auto-retries unless idempotency-key is present.
-* **Idempotency**: Accept `Idempotency-Key` on `POST /bff/swaps`, `/accept`, `/cancel`, `/decline`, `/me/books`,
-  `/uploads:complete`.
-* **Pagination**: Prefer `cursor` over page/size for lists; BFF can translate page/size → cursor internally if
-  downstream doesn’t support cursors yet.
+1. `GET /catalog/books/{bookId}`
+2. `POST /media/view-urls:batch`
 
 ---
 
-# Do you need Request/Response DTOs everywhere?
+### `GET /books/matches/{bookId}?tolerance=`
 
-**Short answer:**
+**Purpose:** Find books with similar valuation.
+**Param:** `tolerance` (default `0.15`)
+**Downstream:**
 
-* **Yes for the BFF public boundary.** Always define **your own BFF Request/Response DTOs** (what the frontend sees).
-  This keeps the UI contract stable even if downstream services evolve.
-* **For downstream calls, use separate small client DTOs per service** (CatalogClientDTO, MediaClientDTO, etc.) to
-  decouple from their models. Map to/from your BFF DTOs.
-
-**Practical rules:**
-
-1. **Public BFF API = your DTOs (mandatory).**
-
-    * These are your “view models” shaped for the UI (e.g., include pre-signed URLs, merged fields, etc.).
-    * Never expose internal IDs/headers you don’t want clients to rely on.
-
-2. **Downstream Clients = service-scoped DTOs (recommended).**
-
-    * Create tiny DTOs that match what you actually read/write for each service call.
-    * Keep them **package-scoped** inside a `client/catalog`, `client/media`, … module so changes are localized.
-
-3. **Mapping layer (thin).**
-
-    * Centralize mapping in `mappers/` (manual mappers or MapStruct).
-    * Name them clearly: `CatalogToBffMapper`, `MediaToBffMapper`, etc.
-
-4. **When is pass-through acceptable?**
-
-    * Only for *temporary* plumbing or admin-only internal tools. For your public BFF endpoints, pass-through couples
-      your UI to microservice internals and will bite you later.
-
-5. **Error DTO (one shape).**
-
-    * Standardize the BFF error response:
-
-      ```json
-      { "error": { "code": "UPSTREAM_TIMEOUT", "message": "Catalog timed out", "details": {"service":"catalog"} } }
-      ```
-    * Map downstream errors into your codes (`CATALOG_NOT_FOUND`, `SWAP_CONFLICT`, etc.).
-
-6. **Validation DTOs.**
-
-    * For write endpoints, keep BFF request DTOs minimal and validate early (Bean Validation).
-    * Example: `CreateSwapRequest{ requesterBookId, responderBookId }`.
-
-**Tiny example (Java records)**
-
-```java
-public record FeedItemDto(String bookId, String title, String author,
-                          String condition, ValuationDto valuation,
-                          String thumbnailUrl, String ownerId) {
-}
-
-public record ValuationDto(double coins, double confidence) {
-}
-```
-
-```java
-// catalog client
-record CatalogRecentBook(String bookId, String title, String author,
-                         String condition, Double coins, Double confidence,
-                         String primaryMediaId, String ownerId) {
-}
-
-// media client
-record MediaViewUrl(String mediaId, String url, Instant expiresAt) {
-}
-```
-
-```java
-FeedItemDto toFeedItem(CatalogRecentBook b, Map<String, MediaViewUrl> mediaMap) {
-  var url = mediaMap.getOrDefault(b.primaryMediaId(), null);
-  return new FeedItemDto(
-          b.bookId(), b.title(), b.author(), b.condition(),
-          new ValuationDto(nz(b.coins()), nz(b.confidence())),
-          url != null ? url.url() : null,
-          b.ownerId()
-  );
-}
-```
+1. `GET /catalog/books/{bookId}/matches?tolerance=`
+2. `POST /media/view-urls:batch`
 
 ---
 
-```
-com.bookswap.backend_for_frontend
-├─ api/ # controllers
-│ ├─ MeController.java
-│ ├─ FeedController.java
-│ ├─ BooksController.java
-│ ├─ SwapsController.java
-│ └─ NotificationsController.java
-├─ service/ # orchestration
-│ ├─ MeService.java
-│ ├─ FeedService.java
-│ ├─ BooksService.java
-│ ├─ SwapsService.java
-│ └─ NotificationsService.java
-├─ client/ # one per downstream service
-│ ├─ CatalogClient.java
-│ ├─ MediaClient.java
-│ ├─ SwapClient.java
-│ ├─ WalletClient.java
-│ └─ NotificationClient.java
-├─ dto/ # BFF-public DTOs (what FE sees)
-│ └─ ...
-├─ mapper/ # maps client DTOs -> BFF DTOs
-│ └─ ...
-└─ config/ # security, cors, webclient, properties
-```
+### `GET /books/me/get`
+
+**Purpose:** Get all books owned by current user.
+**Downstream:**
+
+1. `GET /catalog/books/user/{userId}`
+2. `POST /media/view-urls:batch`
 
 ---
 
-page shaped api layer + service layer pairs:
-home feed only has books by diff users
-my books page has only my books
-swap center has requests by me and requests to me
-add book page is for adding my books
-when click book, takes to book page
+### `DELETE /books/me/delete/{bookId}`
 
-* also need page or feature where user selects one of their books and gets matching books with similar valuation (
-  endpoint alrdy exists in catalog service)
-
-so yea i realized that, maybe better to make a feeditem dto and also i realized that, maybe better to fetch one image
-each from media service
-
-add book page on frontend:
-User clicks Add Book
-Frontend → BFF: sends create init request
-BFF: creates book in Catalog, calls Media Service, gets presigned URLs, returns them to FE
-Frontend: uploads images directly to storage via PUT using those URLs
-Frontend → BFF: sends complete upload request after uploads finish
-BFF: confirms upload with Media Service and finalizes creation
-Frontend: receives success response and redirects to the book page
+**Purpose:** Delete or unlist a user’s book.
+**Downstream:** `DELETE /catalog/books/{bookId}`
 
 ---
 
-## Checklist
+### `POST /books/create/init`
 
-**Done**
+**Purpose:** Step 1 of add-book — create book metadata & init uploads.
+**Downstream:**
 
-* [x] `GET /api/bff/navbar/snapshot`
-* [x] `GET /api/bff/home/feed?limit=`
-* [x] `GET /api/bff/books/get/{bookId}`
-* [x] `GET /api/bff/books/matches/{bookId}?tolerance=`
-* [x] `GET /api/bff/books/me/get`
-* [x] `DELETE /api/bff/books/me/delete/{bookId}`
-* [x] `POST /api/bff/books/create/init`
-* [x] `POST /api/bff/books/create/complete`
-* [x] `GET /api/bff/navbar/notifications?unreadOnly=&page=&size=`
-* [x] `POST /api/bff/navbar/notifications/read`
+1. `POST /catalog/books`
+2. `POST /media/uploads/init`
 
-**Pending**
+---
 
-* [ ] Swap Center endpoints (`/bff/me/swaps/*`, `/bff/swaps/*`) per design above
-* [ ] Wallet quick fetch endpoint (`/bff/wallet/balance`) if you want a dedicated BFF route (snapshot already fetches
-  balance for navbar)
+### `POST /books/create/complete`
+
+**Purpose:** Step 2 — confirm completed uploads and finalize creation.
+**Downstream:** `POST /media/uploads/{bookId}/complete`
+
+---
+
+## **3) Swap Center**
+
+### `GET /swap/me/sent`
+
+**Purpose:** List swaps sent by current user.
+**Downstream:** `GET /swap/requests/sent?requesterUserId=&swapStatus=`
+
+---
+
+### `GET /swap/me/received`
+
+**Purpose:** List swaps received by current user.
+**Downstream:** `GET /swap/requests/received?responderUserId=&swapStatus=`
+
+---
+
+### `GET /swap/book/{bookId}/requests`
+
+**Purpose:** List all swaps involving a specific book (for book owner).
+**Downstream:** `GET /swap/requests/for-book?userId=&bookId=`
+
+---
+
+### `POST /swap/create`
+
+**Purpose:** Create a new swap request.
+**Body:** `{ requesterBookId, responderBookId, responderUserId }`
+**Downstream:** `POST /swap/requests/create`
+
+---
+
+### `POST /swap/cancel/{swapId}`
+
+**Purpose:** Cancel a swap (by requester).
+**Downstream:** `POST /swap/requests/cancel`
+
+---
+
+### `POST /swap/accept/{swapId}`
+
+**Purpose:** Accept a swap (by responder).
+**Downstream:** `POST /swap/requests/accept`
+
+---
+
+## **4) Policies & Notes**
+
+* **Token relay:** Forward JWT in all downstream calls.
+* **Timeouts:** Reads use ~1–2 s with 1 retry; writes don’t auto-retry.
+* **Idempotency:** Supported via optional `Idempotency-Key` header on writes.
+* **Pagination:** Notifications use page/size; other lists use `limit`.
+* **Error handling:** Standardize error format if needed across downstreams.
+
+---
+
+## **5) Future Improvements**
+
+### **Authentication & Ownership Checks**
+
+Add backend verification using relayed JWT:
+
+* Derive `userId` from JWT, not client input.
+* Validate ownership before modifying or deleting resources.
+* Enforce per-user access:
+
+    * Only book owners can delete or view their swap requests.
+    * Only swap requester can cancel; only responder can accept.
+* Downstream services should verify the relayed token matches the claimed user.
+
+---
+
+## **6) Implemented Endpoints Summary**
+
+✅ `/navbar/snapshot`  
+✅ `/navbar/notifications` + `/read`  
+✅ `/home/feed`  
+✅ `/books/get/{bookId}`  
+✅ `/books/matches/{bookId}`  
+✅ `/books/me/get` + `/me/delete/{bookId}`  
+✅ `/books/create/init` + `/create/complete`  
+✅ `/swap/me/sent` + `/me/received`  
+✅ `/swap/book/{bookId}/requests`  
+✅ `/swap/create` + `/cancel/{swapId}` + `/accept/{swapId}`
+
+---
