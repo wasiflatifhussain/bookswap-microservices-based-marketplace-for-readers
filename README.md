@@ -134,4 +134,10 @@ Each service runs independently, communicates through Kafka events, and contribu
 * Observability includes structured logs and request tracing across services.
 * Containerization & orchestration planned via **Docker Compose** for local and **Kubernetes (AWS)** for deployment.
 
+### **Next Steps**
 
+* Integrate a **Eureka Server** for **service discovery** and attach all microservices to it.
+  This will allow each service to register itself dynamically and enable inter-service communication without hard-coded
+  URLs.
+  The BFF, Catalog, Swap, Wallet, and Notification services will discover each other through Eureka to simplify scaling
+  and orchestration.
