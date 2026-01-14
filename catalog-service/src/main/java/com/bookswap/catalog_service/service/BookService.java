@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -430,11 +432,9 @@ public class BookService {
 
   private String currentUserEmailOrNull() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth == null) return null;
-    Object details = auth.getDetails();
-    if (details instanceof Map<?, ?> map) {
-      Object e = map.get("email");
-      return e != null ? e.toString() : null;
+    if (auth instanceof JwtAuthenticationToken jwtAuth) {
+      Jwt jwt = jwtAuth.getToken();
+      return jwt.getClaimAsString("email");
     }
     return null;
   }
