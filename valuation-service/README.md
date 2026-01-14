@@ -41,10 +41,13 @@ finalized and unlisting a book when it is no longer available.
 
 ### Service-to-Service Authentication
 
-- Since we are calling service to service with no API calls, we don't have auth tokens, so media service will return
-    403.
-- To avoid that, we made a new Keycloak client called `service-service-comms` and use that to obtain a service token and
-  pass that during web-config setup, which allows verification and permissions.
+- The Valuation Service calls the Media Service using **JWT-based service authentication**.
+- A dedicated Keycloak client (`service-service-comms`) is used to obtain a **client credentials JWT**.
+- This service token is attached as a Bearer token on outgoing HTTP requests to the Media Service.
+- The Media Service validates the JWT **locally** (no token introspection) and enforces access accordingly.
+- Note:
+  Authentication is JWT-based; tokens issued by Keycloak are validated locally by downstream services.
+  Token introspection is not used.
 
 ---
 
