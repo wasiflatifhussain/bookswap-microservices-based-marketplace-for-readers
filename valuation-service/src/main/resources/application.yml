@@ -35,9 +35,6 @@ spring:
       auto-offset-reset: earliest
 
 keycloak:
-  introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
-  client-id: bookswap-backend
-  client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
   token-uri: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token
   service-service-comms-client:
     client-id: service-service-comms

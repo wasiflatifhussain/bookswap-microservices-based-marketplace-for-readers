@@ -64,10 +64,5 @@ media:
       size:
         bytes: 5242880  # 5 MB
 
-keycloak:
-  introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
-  client-id: bookswap-backend
-  client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
-
 server:
   port: 8082

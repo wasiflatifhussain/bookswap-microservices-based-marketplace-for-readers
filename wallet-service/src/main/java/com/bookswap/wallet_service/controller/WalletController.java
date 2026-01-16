@@ -9,6 +9,8 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,7 +22,13 @@ public class WalletController {
 
   @GetMapping("/me/balance")
   public ResponseEntity<BalanceResponse> getUserBalance(Authentication authentication) {
-    return ResponseEntity.ok(walletService.getUserBalance(authentication.getName()));
+    if (!(authentication instanceof JwtAuthenticationToken jwtAuth)) {
+      throw new IllegalStateException("Invalid authentication type");
+    }
+
+    Jwt jwt = jwtAuth.getToken();
+    String email = jwt.getClaimAsString("email");
+    return ResponseEntity.ok(walletService.getUserBalance(email));
   }
 
   @PostMapping("/{userId}/reserve")
@@ -41,13 +49,15 @@ public class WalletController {
   public ResponseEntity<WalletMutationResponse> confirmSwapSuccessForRequester(
       @PathVariable String userId,
       @Valid @RequestBody WalletMutationRequest walletMutationRequest) {
-    return ResponseEntity.ok(walletService.confirmSwapSuccessForRequester(userId, walletMutationRequest));
+    return ResponseEntity.ok(
+        walletService.confirmSwapSuccessForRequester(userId, walletMutationRequest));
   }
 
   @PostMapping("/{userId}/responder/confirm")
   public ResponseEntity<WalletMutationResponse> confirmSwapSuccessForResponder(
-          @PathVariable String userId,
-          @Valid @RequestBody WalletMutationRequest walletMutationRequest) {
-    return ResponseEntity.ok(walletService.confirmSwapSuccessForResponder(userId, walletMutationRequest));
+      @PathVariable String userId,
+      @Valid @RequestBody WalletMutationRequest walletMutationRequest) {
+    return ResponseEntity.ok(
+        walletService.confirmSwapSuccessForResponder(userId, walletMutationRequest));
   }
 }

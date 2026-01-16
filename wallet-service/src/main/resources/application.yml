@@ -33,15 +33,14 @@ spring:
           topic: catalog.events
           group-id: wallet-catalog-consumers
       auto-offset-reset: earliest
-
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/BookSwap
+          
 server:
   port: 8084
-
-
-keycloak:
-  introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
-  client-id: bookswap-backend
-  client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
 
 outbox:
   relay:
