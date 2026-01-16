@@ -4,7 +4,7 @@ import com.bookswap.notification_service.dto.response.NotificationItem;
 import com.bookswap.notification_service.service.NotificationService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,18 +18,21 @@ public class NotificationController {
       @RequestParam(name = "unreadOnly", defaultValue = "false") boolean unreadOnly,
       @RequestParam(name = "page", defaultValue = "0") int page,
       @RequestParam(name = "size", defaultValue = "20") int size,
-      Authentication authentication) {
-    return notificationService.getNotifications(authentication.getName(), unreadOnly, page, size);
+      JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject();
+    return notificationService.getNotifications(userId, unreadOnly, page, size);
   }
 
   @PostMapping("/read")
   public void markNotificationsAsRead(
-      @RequestBody List<String> notificationIds, Authentication authentication) {
-    notificationService.markNotificationsAsRead(authentication.getName(), notificationIds);
+      @RequestBody List<String> notificationIds, JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject();
+    notificationService.markNotificationsAsRead(userId, notificationIds);
   }
 
   @GetMapping("/unread-count")
-  public Integer getUnreadNotificationCount(Authentication authentication) {
-    return notificationService.getUnreadNotificationCount(authentication.getName());
+  public Integer getUnreadNotificationCount(JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject();
+    return notificationService.getUnreadNotificationCount(userId);
   }
 }

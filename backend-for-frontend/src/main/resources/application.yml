@@ -10,15 +10,15 @@ spring:
     wallet: http://localhost:8084
     swap: http://localhost:8085
     notification: http://localhost:8086
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/BookSwap
 
 http:
   timeoutMs: 2000
   maxInMemoryMb: 16
-
-keycloak:
-  introspect-url: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token/introspect
-  client-id: bookswap-backend
-  client-secret: TnqapI5mhPPlj2v9GNmheiTPoN1xKOxI
 
 server:
   port: 8080

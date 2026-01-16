@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,29 +20,29 @@ public class SwapCenterController {
 
   @GetMapping("/me/sent")
   public ResponseEntity<List<SwapResponseDto>> getMySentSwapRequests(
-      Authentication authentication) {
-    String userId = authentication.getName();
+      JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject();
     return ResponseEntity.ok(swapCenterService.getMySentSwapRequests(userId));
   }
 
   @GetMapping("/me/received")
   public ResponseEntity<List<SwapResponseDto>> getMyReceivedSwapRequests(
-      Authentication authentication) {
-    String userId = authentication.getName();
+      JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject();
     return ResponseEntity.ok(swapCenterService.getMyReceivedSwapRequests(userId));
   }
 
   @GetMapping("/book/{bookId}/requests")
   public ResponseEntity<List<SwapResponseDto>> getSwapRequestsForBook(
-      @PathVariable String bookId, Authentication authentication) {
-    String userId = authentication.getName();
+      @PathVariable String bookId, JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject();
     return ResponseEntity.ok(swapCenterService.getSwapRequestsForBook(userId, bookId));
   }
 
   @PostMapping("/cancel/{swapId}")
   public ResponseEntity<SwapResponseDto> cancelSwapRequest(
-      @PathVariable String swapId, Authentication authentication) {
-    String userId = authentication.getName();
+      @PathVariable String swapId, JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject();
     return ResponseEntity.ok(swapCenterService.cancelSwapRequest(swapId, userId));
   }
 

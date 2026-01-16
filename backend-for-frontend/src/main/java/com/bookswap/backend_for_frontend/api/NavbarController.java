@@ -7,7 +7,7 @@ import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 /** Controller for handling navbar snapshots: wallet, unread notifications, email */
@@ -19,7 +19,7 @@ public class NavbarController {
   private final NavbarService navbarService;
 
   @GetMapping("/snapshot")
-  public ResponseEntity<NavbarSnapshotDto> snapshot(Authentication authentication) {
+  public ResponseEntity<NavbarSnapshotDto> snapshot(JwtAuthenticationToken authentication) {
     NavbarSnapshotDto snapshot = navbarService.getSnapshot(authentication);
     return switch (snapshot.getStatus()) {
       case "OK" -> ResponseEntity.ok(snapshot);

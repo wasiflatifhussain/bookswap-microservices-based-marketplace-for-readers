@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: bookswap-postgres
+    environment:
+      POSTGRES_USER: bookswap
+      POSTGRES_PASSWORD: bookswap
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: bookswap-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      # required for single-broker dev
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "19092:9092"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+
+  kafka-init:
+    image: apache/kafka:latest
+    container_name: bookswap-kafka-init
+    depends_on:
+      - kafka
+    volumes:
+      - ./kafka/init:/init:ro
+    entrypoint: [ "/bin/bash", "/init/create-topics.sh" ]
+    restart: "no"
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    container_name: bookswap-kafdrop
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKERCONNECT: "kafka:9092"
+      SERVER_PORT: "9000"
+    ports:
+      - "9000:9000"
+
+#  declaring named volumes
+volumes:
+  pgdata:
+  kafkadata:
