@@ -1,20 +1,23 @@
 spring:
   application:
     name: backend-for-frontend
+
   output:
     ansi:
       enabled: ALWAYS
+
   client-endpoints:
-    catalog: http://localhost:8081
-    media: http://localhost:8082
-    wallet: http://localhost:8084
-    swap: http://localhost:8085
-    notification: http://localhost:8086
+    catalog: ${CATALOG_SERVICE_URL:http://localhost:8081}
+    media: ${MEDIA_SERVICE_URL:http://localhost:8082}
+    wallet: ${WALLET_SERVICE_URL:http://localhost:8084}
+    swap: ${SWAP_SERVICE_URL:http://localhost:8085}
+    notification: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
+
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8180/realms/BookSwap
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/BookSwap}
 
 http:
   timeoutMs: 2000

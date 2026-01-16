@@ -1,15 +1,18 @@
 spring:
   application:
     name: media-service
+
   output:
     ansi:
       enabled: ALWAYS
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/bookswap_media_db
-    username: wasiflatifhussain
-    password: password
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bookswap_media_db
+    username: ${DB_USERNAME:wasiflatifhussain}
+    password: ${DB_PASSWORD:password}
     hikari:
       auto-commit: false
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -17,6 +20,7 @@ spring:
     properties:
       hibernate:
         jdbc.lob.non_contextual_creation: true
+
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -33,11 +37,12 @@ spring:
           topic: catalog.events
           group-id: media-catalog-consumers
       auto-offset-reset: earliest
+
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8180/realms/BookSwap
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/BookSwap}
 
 cloud:
   aws:
@@ -45,7 +50,7 @@ cloud:
       access-key: ${AWS_ACCESS_KEY}
       secret-key: ${AWS_SECRET_ACCESS_KEY}
     region:
-      static: ap-southeast-1
+      static: ${AWS_REGION:ap-southeast-1}
 
 aws:
   s3:
