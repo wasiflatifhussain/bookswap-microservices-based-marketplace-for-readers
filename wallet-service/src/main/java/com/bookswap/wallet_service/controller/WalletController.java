@@ -8,8 +8,6 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,14 +19,9 @@ public class WalletController {
   private final WalletService walletService;
 
   @GetMapping("/me/balance")
-  public ResponseEntity<BalanceResponse> getUserBalance(Authentication authentication) {
-    if (!(authentication instanceof JwtAuthenticationToken jwtAuth)) {
-      throw new IllegalStateException("Invalid authentication type");
-    }
-
-    Jwt jwt = jwtAuth.getToken();
-    String email = jwt.getClaimAsString("email");
-    return ResponseEntity.ok(walletService.getUserBalance(email));
+  public ResponseEntity<BalanceResponse> getUserBalance(JwtAuthenticationToken authentication) {
+    String userId = authentication.getToken().getSubject(); // UUID
+    return ResponseEntity.ok(walletService.getUserBalance(userId));
   }
 
   @PostMapping("/{userId}/reserve")
