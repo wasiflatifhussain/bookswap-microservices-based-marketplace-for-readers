@@ -1,15 +1,18 @@
 spring:
   application:
     name: valuation-service
+
   output:
     ansi:
       enabled: ALWAYS
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/bookswap_valuation_db
-    username: wasiflatifhussain
-    password: password
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bookswap_valuation_db
+    username: ${DB_USERNAME:wasiflatifhussain}
+    password: ${DB_PASSWORD:password}
     hikari:
       auto-commit: false
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -17,6 +20,7 @@ spring:
     properties:
       hibernate:
         jdbc.lob.non_contextual_creation: true
+
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -35,10 +39,10 @@ spring:
       auto-offset-reset: earliest
 
 keycloak:
-  token-uri: http://localhost:8180/realms/BookSwap/protocol/openid-connect/token
+  token-uri: ${KEYCLOAK_TOKEN_URI:http://localhost:8180/realms/BookSwap/protocol/openid-connect/token}
   service-service-comms-client:
-    client-id: service-service-comms
-    client-secret: 0v14E7eU4MkChgKuXnrryoByTrhSO5CD
+    client-id: ${KEYCLOAK_SERVICE_CLIENT_ID:service-service-comms}
+    client-secret: ${KEYCLOAK_SERVICE_CLIENT_SECRET}
 
 gemini:
   api:
