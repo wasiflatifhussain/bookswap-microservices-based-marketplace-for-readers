@@ -11,6 +11,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - bookswap-net
 
   kafka:
     image: apache/kafka:latest
@@ -33,6 +35,8 @@ services:
       - "19092:9092"
     volumes:
       - kafkadata:/var/lib/kafka/data
+    networks:
+      - bookswap-net
 
   kafka-init:
     image: apache/kafka:latest
@@ -43,6 +47,8 @@ services:
       - ./kafka/init:/init:ro
     entrypoint: [ "/bin/bash", "/init/create-topics.sh" ]
     restart: "no"
+    networks:
+      - bookswap-net
 
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
@@ -54,8 +60,31 @@ services:
       SERVER_PORT: "9000"
     ports:
       - "9000:9000"
+    networks:
+      - bookswap-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.4
+    container_name: bookswap-keycloak
+    command:
+      - start-dev
+      - --http-port=8180
+      - --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8180"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import
+    networks:
+      - bookswap-net
 
 #  declaring named volumes
 volumes:
   pgdata:
   kafkadata:
+
+networks:
+  bookswap-net:
+    name: bookswap-net
