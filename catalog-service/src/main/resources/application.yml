@@ -41,7 +41,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: https://securetoken.google.com/bookswap-26231
+          issuer-uri: ${FIREBASE_ISSUER_URI:https://securetoken.google.com/bookswap-26231}
 server:
   port: 8081
 

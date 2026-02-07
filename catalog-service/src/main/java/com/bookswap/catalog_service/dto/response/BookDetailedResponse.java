@@ -31,7 +31,7 @@ public class BookDetailedResponse {
   private BookStatus bookStatus;
 
   private List<String> mediaIds;
-  private String ownerUserId; // NOTE: store Keycloak ID for users
+  private String ownerUserId; // NOTE: store firebase user-ID for users
 
   private LocalDateTime createdAt;
 
