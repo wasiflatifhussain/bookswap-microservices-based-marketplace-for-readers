@@ -1,20 +1,22 @@
 # Catalog Service
 
-The Catalog Service manages book records, their metadata, and their state in the marketplace. It exposes REST endpoints
-for CRUD operations and participates in the event-driven workflow via Kafka.
+The Catalog Service manages book records, their metadata, and their state in the marketplace.
+It exposes REST endpoints for CRUD operations and participates in the event-driven workflow via Kafka.
 
-The service uses **JWT-based authentication** and acts as an **OAuth2 Resource Server**, validating
-**Keycloak-issued JWT access tokens locally** (no token introspection).
+The service uses **JWT-based authentication** and acts as an **OAuth2 Resource Server**,
+validating **Firebase-issued JWT ID tokens locally** (no token introspection).
 
 ---
 
 ## Authentication & Security Model
 
-* Authentication is performed using **OAuth2 Bearer JWTs** issued by Keycloak.
-* JWTs are **validated locally** by the service using Keycloak’s public keys (OIDC discovery).
+* Authentication is performed using **Firebase Authentication**.
+* Clients obtain a **Firebase ID token (JWT)** after signing in.
+* JWTs are **validated locally** by the service using Google’s public signing keys via OIDC discovery (
+  `securetoken.google.com`).
 * Each request is authenticated independently (stateless, zero-trust).
-* No runtime calls are made to Keycloak for token validation.
-* User identity is derived from the JWT `sub` claim.
+* No runtime calls are made to Firebase for token validation.
+* User identity is derived from the JWT `sub` claim (Firebase UID).
 * Role-based authorization is currently **not enforced**; ownership checks are handled at the application/data layer.
 
 ---
@@ -194,3 +196,19 @@ The service uses **JWT-based authentication** and acts as an **OAuth2 Resource S
 * Media and valuation updates are handled asynchronously via Kafka.
 * The Catalog Service does not store or serve images directly; it stores media IDs and resolves signed URLs via the
   Media Service.
+
+```bash
+docker build -t bookswap-catalog:latest .
+
+docker run -d \
+--name bookswap-catalog \
+--network bookswap-net \
+-p 8081:8081 \
+-e DB_HOST=bookswap-postgres \
+-e DB_PORT=5432 \
+-e DB_USERNAME=bookswap \
+-e DB_PASSWORD=bookswap \
+-e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+bookswap-catalog:latest
+
+```

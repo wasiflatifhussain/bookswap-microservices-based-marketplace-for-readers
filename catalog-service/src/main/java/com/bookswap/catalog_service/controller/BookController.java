@@ -24,8 +24,8 @@ public class BookController {
   @PostMapping("/books")
   public ResponseEntity<BookSimpleResponse> addBook(
       @Valid @RequestBody BookRequest bookRequest, Authentication authentication) {
-    String keyCloakId = authentication.getName(); // Remove tight-coupling of service with Keycloak
-    return ResponseEntity.ok(bookService.addBook(bookRequest, keyCloakId));
+    String userId = authentication.getName();
+    return ResponseEntity.ok(bookService.addBook(bookRequest, userId));
   }
 
   @GetMapping("/books/{bookId}")

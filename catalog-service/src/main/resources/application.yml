@@ -41,8 +41,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/BookSwap}
-
+          issuer-uri: https://securetoken.google.com/bookswap-26231
 server:
   port: 8081
 
