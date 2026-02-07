@@ -32,13 +32,13 @@ public class BookService {
   private final OutboxService outboxService;
 
   @Transactional
-  public BookSimpleResponse addBook(BookRequest bookRequest, String keycloakId) {
+  public BookSimpleResponse addBook(BookRequest bookRequest, String userId) {
     log.info("Initiating adding book to for title={}", bookRequest.getTitle());
 
     try {
 
       String ownerEmail = currentUserEmailOrNull();
-      Book book = mapRequestToBook(bookRequest, keycloakId, ownerEmail);
+      Book book = mapRequestToBook(bookRequest, userId, ownerEmail);
       Book savedBook = bookRepository.save(book);
 
       BookCreatedEvent bookCreatedEvent =
@@ -443,7 +443,7 @@ public class BookService {
     return (list != null && !list.isEmpty()) ? list.get(0) : null;
   }
 
-  private Book mapRequestToBook(BookRequest bookRequest, String keycloakId, String ownerEmail) {
+  private Book mapRequestToBook(BookRequest bookRequest, String userId, String ownerEmail) {
     return Book.builder()
         .title(bookRequest.getTitle())
         .description(bookRequest.getDescription())
@@ -452,7 +452,7 @@ public class BookService {
         .bookCondition(bookRequest.getBookCondition())
         .valuation(bookRequest.getValuation())
         .bookStatus(BookStatus.AVAILABLE)
-        .ownerUserId(keycloakId)
+        .ownerUserId(userId)
         .ownerEmail(ownerEmail)
         .mediaIds(bookRequest.getMediaIds())
         .build();

@@ -10,27 +10,26 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * SecurityConfig
  *
- * <p>Purpose: -------- Configures JWT-based authentication for the Catalog Service using Spring
- * Security.
+ * <p>Purpose: Configures JWT-based authentication for the Catalog Service using Spring Security.
  *
- * <p>This service acts as an OAuth2 Resource Server and validates incoming Keycloak-issued JWT
- * access tokens locally (no token introspection).
+ * <p>This service acts as an OAuth2 Resource Server and validates incoming Firebase-issued JWT ID
+ * tokens locally (no token introspection).
  *
- * <p>Key Responsibilities: --------------------- - Enforces authentication for all protected API
- * endpoints - Validates JWT signature, issuer, and expiration using Keycloak public keys - Builds a
- * Spring Security Authentication object from the JWT
+ * <p>Key Responsibilities: - Enforces authentication for all protected API endpoints - Validates
+ * JWT signature, issuer, and expiration using Firebase public keys - Builds a Spring Security
+ * Authentication object from the JWT
  *
- * <p>Design Decisions: ----------------- - Role / authority mapping is intentionally disabled for
- * now (identity-based authorization is sufficient for this service) - User identity is derived from
- * the JWT `sub` claim - Authorization is enforced at the application/data layer (e.g., ownerUserId
+ * <p>Design Decisions: - Role / authority mapping is intentionally disabled for now (identity-based
+ * authorization is sufficient for this service) - User identity is derived from the JWT `sub` claim
+ * (Firebase UID) - Authorization is enforced at the application/data layer (e.g., ownerUserId
  * checks in services)
  *
- * <p>Security Model: --------------- - Stateless, zero-trust authentication - No runtime dependency
- * on Keycloak (keys are discovered via OIDC) - Each request is independently authenticated using
- * cryptographic verification
+ * <p>Security Model: - Stateless, zero-trust authentication - No runtime dependency on Firebase
+ * services - JWTs are verified locally using Google’s public signing keys - Each request is
+ * independently authenticated using cryptographic verification
  *
- * <p>Notes: ------ - Role-based access control (RBAC) can be added later by enabling JWT
- * role-to-authority conversion if needed.
+ * <p>Notes: - Role-based access control (RBAC) can be added later by enabling JWT
+ * claim-to-authority conversion if needed.
  */
 @Configuration
 public class SecurityConfig {
