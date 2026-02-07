@@ -8,79 +8,6 @@ under main file runner, add config:
 AWS_ACCESS_KEY=<your-aws-access-key>; AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>; S3_BUCKET_NAME=<
 your-s3-bucket-name>;
 
-# to dos:
-
-for each user, maybe later we just make folders in s3 so easier to fetch media for that user?
-
-```
-src/
-└─ main/
-   ├─ java/
-   │  └─ com/bookswap/media_service/
-   │     ├─ MediaServiceApplication.java
-   │     │
-   │     ├─ config/
-   │     │  ├─ S3Config.java                 // S3/MinIO client, endpoint/region creds
-   │     │  ├─ KafkaConfig.java              // producer template, topics, DLQ
-   │     │  ├─ AppProperties.java            // @ConfigurationProperties for bucket, CDN, limits
-   │     │  └─ WebConfig.java                // CORS (allow PUT to S3 origin if presign flow)
-   │     │
-   │     ├─ domain/
-   │     │  ├─ Media.java                    // JPA entity: media_id, book_id, owner, kind, urls, status
-   │     │  ├─ Upload.java                   // JPA entity: upload_id, media_id, expected_size, mime, expires_at, status
-   │     │  └─ model/
-   │     │     ├─ MediaKind.java             // COVER | CONDITION | OTHER
-   │     │     └─ MediaStatus.java           // PENDING | UPLOADED | PROCESSED | FAILED
-   │     │
-   │     ├─ repository/
-   │     │  ├─ MediaRepository.java
-   │     │  └─ UploadRepository.java
-   │     │
-   │     ├─ dto/
-   │     │  ├─ request/
-   │     │  │  ├─ UploadInitRequest.java     // files:[{name,size,mime,kind}]
-   │     │  │  └─ CompleteUploadRequest.java // (optional) if you send checksum, etc.
-   │     │  └─ response/
-   │     │     ├─ UploadInitResponse.java    // tickets: uploadId, mediaId, presignedUrl, headers...
-   │     │     └─ MediaResponse.java
-   │     │
-   │     ├─ service/
-   │     │  ├─ StorageService.java           // low-level S3 ops (put/get/head, presign)
-   │     │  ├─ UploadService.java            // business flow: init/complete, validate, persist
-   │     │  ├─ MediaService.java             // read/delete media, cascade S3 delete, emit events
-   │     │  ├─ ThumbnailService.java         // async thumb worker (can be scheduled/consumer)
-   │     │  └─ EventPublisher.java           // wraps KafkaTemplate, outbox if you add it
-   │     │
-   │     ├─ controller/
-   │     │  ├─ UploadController.java         // POST /media/books/{bookId}/uploads:init
-   │     │  │                                // POST /media/uploads/{uploadId}/complete
-   │     │  └─ MediaController.java          // GET/DELETE /media/{mediaId}, (optional) POST /media/.../images for proxy mode
-   │     │
-   │     ├─ messaging/
-   │     │  ├─ event/                        // payload classes: MediaUploadedEvent, MediaProcessedEvent
-   │     │  ├─ producer/                     // MediaEventsProducer (Kafka)
-   │     │  └─ consumer/                     // (empty for now; add if media listens to others)
-   │     │
-   │     ├─ security/
-   │     │  └─ JwtAuthConfig.java            // resource server config when you hook Keycloak
-   │     │
-   │     ├─ exception/
-   │     │  ├─ GlobalExceptionHandler.java
-   │     │  ├─ NotOwnerException.java
-   │     │  └─ ValidationException.java
-   │     │
-   │     └─ util/
-   │        ├─ ObjectKeyBuilder.java         // books/{bookId}/{mediaId}/original, thumb.jpg
-   │        └─ Checksums.java                // MD5/base64 helpers (optional)
-   │
-   └─ resources/
-      ├─ application.yml
-      └─ db/migration/                       // (optional) Flyway/Liquibase for media + upload tables
-         └─ V1__init.sql
-
----
-```
-
 ## Media + Catalog: Final Notes (Sequential + Pre-Signed URLs)
 
 ### Core Principles
@@ -259,12 +186,14 @@ src/
 
 ### Security & Auth
 
-- Private bucket only.
-- Media endpoints require a valid user (Keycloak/JWT) and authorization:
-    - uploads:init and complete: user must own bookId.
-    - view-url: allow if the book is publicly viewable or the requester is the owner (depends on your Catalog visibility
-      rules).
-- Service-to-service (Catalog→Media) uses client credentials (machine token) or mTLS.
+- Media endpoints require a valid user authenticated via **Firebase OAuth2 JWT**.
+- Incoming requests carry a Firebase-issued ID token as a Bearer token.
+- Tokens are validated locally by Spring Security using Google public signing keys.
+- No Firebase Admin SDK or token introspection is used.
+- Authorization is identity-based:
+    - uploads:init and complete → requester must own the bookId
+    - view URLs → access depends on Catalog visibility rules
+- Service-to-service (Catalog → Media) uses internal service authentication (machine token) or mTLS.
 
 ### Non-Goals (for now)
 
@@ -320,7 +249,7 @@ The client (frontend or another service) initiates an upload for one or more ima
 calling:
 
 - **Endpoint:** `POST /api/media/uploads/{bookId}/init`
-- **Auth:** OAuth2.0 Bearer Token (required)
+- **Auth:** Firebase OAuth2 Bearer Token (required)
 - **Body:**
   ```json
   {
@@ -369,14 +298,12 @@ After uploading, the client must confirm the upload:
 
 #### 4. Viewing Images
 
-To view images for a book:
-
 - **Endpoint:** `GET /api/media/downloads/{bookId}/view`
-- **Auth:** OAuth2.0 Bearer Token (required)
-- **What happens:**
-    - The service finds all `STORED` media for the book.
-    - It generates presigned S3 GET URLs for each image, valid for a short time.
-    - The client can use these URLs to view images directly from S3.
+- **Auth:** Not required (public access via short-lived pre-signed URLs)
+- **Behavior:**
+    - Retrieves all STORED media for the given book
+    - Generates short-lived S3 GET URLs
+    - Returns URLs directly to the caller
 
 #### 5. Deleting Media
 
@@ -393,3 +320,26 @@ To view images for a book:
 - Media is always stored in S3 under a folder named after the `bookId`, with each image as a separate object.
 - The Catalog service updates its book records with media IDs based on Kafka events from the Media service.
 - This architecture ensures scalability, security, and consistency across services.
+
+## Dockerization and Deployment
+
+```bash
+docker build -t bookswap/media-service:latest .
+
+docker run -d \
+  --name bookswap-media \
+  -p 8082:8082 \
+  --network bookswap-net \
+  -e DB_HOST=postgres \
+  -e DB_PORT=5432 \
+  -e DB_USERNAME=bookswap \
+  -e DB_PASSWORD=bookswap \
+  -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+  -e FIREBASE_ISSUER_URI=https://securetoken.google.com/bookswap-26231 \
+  -e AWS_ACCESS_KEY=YOUR_AWS_ACCESS_KEY \
+  -e AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY \
+  -e AWS_REGION=ap-southeast-1 \
+  -e S3_BUCKET_NAME=bookswap-media-bucke \
+  bookswap/media-service:latest
+
+```
