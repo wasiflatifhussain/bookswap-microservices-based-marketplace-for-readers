@@ -63,22 +63,6 @@ services:
     networks:
       - bookswap-net
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.3.4
-    container_name: bookswap-keycloak
-    command:
-      - start-dev
-      - --http-port=8180
-      - --import-realm
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    ports:
-      - "8180:8180"
-    volumes:
-      - ./keycloak/import:/opt/keycloak/data/import
-    networks:
-      - bookswap-net
 
 #  declaring named volumes
 volumes:
