@@ -28,13 +28,6 @@ public class GeminiRequest {
         .build();
   }
 
-  public static GeminiRequest fromTextImagesAndSearch(String text, List<GeminiInlineImage> images) {
-    GeminiRequest geminiRequest = fromTextAndInlineImages(text, images);
-    // Enable search tool
-    geminiRequest.setTools(List.of(Map.of("googleSearch", Map.of())));
-    return geminiRequest;
-  }
-
   private static Map<String, Object> defaultJsonGenConfig() {
     // Ensure API returns raw JSON output
     return Map.of("responseMimeType", "application/json");

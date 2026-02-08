@@ -198,17 +198,17 @@ validating **Firebase-issued JWT ID tokens locally** (no token introspection).
   Media Service.
 
 ```bash
-docker build -t bookswap-catalog:latest .
+docker build -t catalog-service:latest .
 
 docker run -d \
---name bookswap-catalog \
+--name catalog-service \
 --network bookswap-net \
 -p 8081:8081 \
--e DB_HOST=bookswap-postgres \
+-e DB_HOST=postgres \
 -e DB_PORT=5432 \
 -e DB_USERNAME=bookswap \
 -e DB_PASSWORD=bookswap \
 -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-bookswap-catalog:latest
+catalog-service:latest
 
 ```

@@ -38,12 +38,10 @@ spring:
           group-id: valuation-catalog-consumers
       auto-offset-reset: earliest
 
-keycloak:
-  token-uri: ${KEYCLOAK_TOKEN_URI:http://localhost:8180/realms/BookSwap/protocol/openid-connect/token}
-  service-service-comms-client:
-    client-id: ${KEYCLOAK_SERVICE_CLIENT_ID:service-service-comms}
-    client-secret: ${KEYCLOAK_SERVICE_CLIENT_SECRET}
-
+media:
+  service:
+    base-url: ${MEDIA_SERVICE_BASE_URL:http://localhost:8082/api/media}
+    
 gemini:
   api:
     url: ${GEMINI_API_URL}

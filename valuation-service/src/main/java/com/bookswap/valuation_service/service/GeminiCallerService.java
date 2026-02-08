@@ -43,8 +43,7 @@ public class GeminiCallerService {
       // Convert presigned URLs -> Inline base64 image data
       List<GeminiInlineImage> images = mediaDownloadClient.downloadImages(mediaResponseList);
 
-      GeminiResponse geminiResponse =
-          geminiClient.getAnswerWithImagesAndSearch(geminiPrompt, images);
+      GeminiResponse geminiResponse = geminiClient.getAnswerWithImages(geminiPrompt, images);
 
       log.info(
           "Gemini rawJson length={} for bookCoins={} comments={}",

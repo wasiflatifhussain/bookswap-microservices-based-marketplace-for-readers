@@ -21,7 +21,7 @@ public class BookFinalizedEvent {
   private Float valuation;
   private String bookStatus;
   private List<String> mediaIds;
-  private String ownerUserId; // NOTE: store Keycloak ID for users
+  private String ownerUserId; // NOTE: store Firebase user-ID for users
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 }

@@ -324,10 +324,10 @@ After uploading, the client must confirm the upload:
 ## Dockerization and Deployment
 
 ```bash
-docker build -t bookswap/media-service:latest .
+docker build -t media-service:latest .
 
 docker run -d \
-  --name bookswap-media \
+  --name media-service \
   -p 8082:8082 \
   --network bookswap-net \
   -e DB_HOST=postgres \
@@ -339,7 +339,7 @@ docker run -d \
   -e AWS_ACCESS_KEY=YOUR_AWS_ACCESS_KEY \
   -e AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY \
   -e AWS_REGION=ap-southeast-1 \
-  -e S3_BUCKET_NAME=bookswap-media-bucke \
-  bookswap/media-service:latest
+  -e S3_BUCKET_NAME=bookswap-media-bucket \
+  media-service:latest
 
 ```
