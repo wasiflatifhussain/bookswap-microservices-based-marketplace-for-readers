@@ -141,3 +141,78 @@ Each service runs independently, communicates through Kafka events, and contribu
   URLs.
   The BFF, Catalog, Swap, Wallet, and Notification services will discover each other through Eureka to simplify scaling
   and orchestration.
+
+## Docker Commands
+
+### Start Infrastructure (Postgres, Kafka)
+
+```bash
+cd infra
+docker compose up -d
+```
+
+### Start Microservices
+
+From the **root project directory**:
+
+```bash
+docker compose up -d --build
+```
+
+This will:
+
+* Build catalog, media, valuation images
+* Start all service containers
+* Connect them to `bookswap-net`
+
+### Stop All Microservice Containers (Keep Them)
+
+```bash
+docker compose stop
+```
+
+### Restart Stopped Containers
+
+```bash
+docker compose start
+```
+
+### Bring Down Microservices (Remove Containers)
+
+```bash
+docker compose down
+```
+
+> Note: External network and infrastructure containers remain running.
+
+### Remove Containers AND Images
+
+```bash
+docker compose down --rmi all
+```
+
+### Rebuild After Code Changes
+
+```bash
+docker compose up -d --build
+```
+
+Or rebuild only one service:
+
+```bash
+docker compose up -d --build valuation-service
+```
+
+### View Logs
+
+All services:
+
+```bash
+docker compose logs -f
+```
+
+Specific service:
+
+```bash
+docker compose logs -f valuation-service
+```

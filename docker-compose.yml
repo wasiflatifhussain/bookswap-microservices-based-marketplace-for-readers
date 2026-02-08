@@ -1,22 +1,31 @@
 services:
   catalog-service:
-    build:
-      context: ./catalog-service
-    container_name: bookswap-catalog-service
-    environment:
-      # database
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-
-      # kafka
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
-
-      # firebase auth
-      FIREBASE_ISSUER_URI: ${FIREBASE_ISSUER_URI}
+    build: ./catalog-service
+    image: catalog-service:latest
+    container_name: catalog-service
     ports:
       - "8081:8081"
+    env_file: .env
+    networks:
+      - bookswap-net
+
+  media-service:
+    build: ./media-service
+    image: media-service:latest
+    container_name: media-service
+    ports:
+      - "8082:8082"
+    env_file: .env
+    networks:
+      - bookswap-net
+
+  valuation-service:
+    build: ./valuation-service
+    image: valuation-service:latest
+    container_name: valuation-service
+    ports:
+      - "8083:8083"
+    env_file: .env
     networks:
       - bookswap-net
 
