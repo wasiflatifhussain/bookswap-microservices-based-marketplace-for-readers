@@ -33,14 +33,13 @@ public class GeminiClient {
     this.mapper = mapper;
   }
 
-  public GeminiResponse getAnswerWithImagesAndSearch(
-      String prompt, List<GeminiInlineImage> images) {
-    GeminiRequest geminiRequest = GeminiRequest.fromTextImagesAndSearch(prompt, images);
+  public GeminiResponse getAnswerWithImages(String prompt, List<GeminiInlineImage> images) {
+    GeminiRequest geminiRequest = GeminiRequest.fromTextAndInlineImages(prompt, images);
     return executeClientCall(geminiRequest);
   }
 
   private GeminiResponse executeClientCall(GeminiRequest geminiRequest) {
-    log.info("Sending request to Gemini API (with images/search enabled)");
+    log.info("Sending request to Gemini API (with images enabled)");
 
     try {
       String rawOutput =
