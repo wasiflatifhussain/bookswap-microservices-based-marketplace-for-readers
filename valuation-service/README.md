@@ -39,16 +39,6 @@ finalized and unlisting a book when it is no longer available.
 - To make the whole service non-blocking, use R2dbcRepo or ReactiveMongoRepo, etc.
 - Non-blocking/reactive/async means the method will free up threads while waiting for responses.
 
-### Service-to-Service Authentication
-
-- The Valuation Service calls the Media Service using **JWT-based service authentication**.
-- A dedicated Keycloak client (`service-service-comms`) is used to obtain a **client credentials JWT**.
-- This service token is attached as a Bearer token on outgoing HTTP requests to the Media Service.
-- The Media Service validates the JWT **locally** (no token introspection) and enforces access accordingly.
-- Note:
-  Authentication is JWT-based; tokens issued by Keycloak are validated locally by downstream services.
-  Token introspection is not used.
-
 ---
 
 ## End-to-End Valuation Workflow
@@ -122,3 +112,24 @@ Update your IDE's run configuration to include the following environment variabl
 - Use a complete computer-wide VPN and not a browser extension.
 
 ---
+
+## Docker Containerization
+
+```bash
+docker build -t valuation-service:latest .
+
+docker run -d \
+  --name valuation-service \
+  -p 8083:8083 \
+  --network bookswap-net \
+  -e DB_HOST=postgres \
+  -e DB_PORT=5432 \
+  -e DB_USERNAME=bookswap \
+  -e DB_PASSWORD=bookswap \
+  -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+  -e GEMINI_API_URL=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent \
+  -e GEMINI_API_KEY=YOUR_GEMINI_API_KEY \
+   -e MEDIA_SERVICE_BASE_URL=http://media-service:8082/api/media \
+  valuation-service:latest
+
+```
