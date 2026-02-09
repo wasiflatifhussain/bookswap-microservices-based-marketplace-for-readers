@@ -29,6 +29,16 @@ services:
     networks:
       - bookswap-net
 
+  wallet-service:
+    build: ./wallet-service
+    image: wallet-service:latest
+    container_name: wallet-service
+    ports:
+      - "8084:8084"
+    env_file: .env
+    networks:
+      - bookswap-net
+
 networks:
   bookswap-net:
     external: true
