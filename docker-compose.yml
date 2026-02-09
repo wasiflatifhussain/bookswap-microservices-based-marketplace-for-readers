@@ -39,6 +39,16 @@ services:
     networks:
       - bookswap-net
 
+  email-service:
+    build: ./email-service
+    image: email-service:latest
+    container_name: email-service
+    ports:
+      - "8085:8085"
+    env_file: .env
+    networks:
+      - bookswap-net
+
   notification-service:
     build: ./notification-service
     image: notification-service:latest
