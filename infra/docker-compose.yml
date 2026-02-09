@@ -63,11 +63,22 @@ services:
     networks:
       - bookswap-net
 
+  redis:
+    image: redis:7
+    container_name: bookswap-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - bookswap-net
+
 
 #  declaring named volumes
 volumes:
   pgdata:
   kafkadata:
+  redisdata:
 
 networks:
   bookswap-net:

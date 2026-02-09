@@ -1,4 +1,4 @@
-package com.bookswap.swap_service.security;
+package com.bookswap.notification_service.security;
 
 import java.util.List;
 import org.springframework.context.annotation.Bean;

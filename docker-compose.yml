@@ -39,6 +39,16 @@ services:
     networks:
       - bookswap-net
 
+  notification-service:
+    build: ./notification-service
+    image: notification-service:latest
+    container_name: notification-service
+    ports:
+      - "8086:8086"
+    env_file: .env
+    networks:
+      - bookswap-net
+
 networks:
   bookswap-net:
     external: true
