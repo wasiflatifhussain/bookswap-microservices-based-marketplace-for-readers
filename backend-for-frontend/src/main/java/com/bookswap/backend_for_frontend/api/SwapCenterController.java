@@ -7,8 +7,8 @@ import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,29 +20,30 @@ public class SwapCenterController {
 
   @GetMapping("/me/sent")
   public ResponseEntity<List<SwapResponseDto>> getMySentSwapRequests(
-      JwtAuthenticationToken authentication) {
-    String userId = authentication.getToken().getSubject();
+      @AuthenticationPrincipal Jwt jwt) {
+    String userId = jwt.getSubject();
     return ResponseEntity.ok(swapCenterService.getMySentSwapRequests(userId));
   }
 
   @GetMapping("/me/received")
   public ResponseEntity<List<SwapResponseDto>> getMyReceivedSwapRequests(
-      JwtAuthenticationToken authentication) {
-    String userId = authentication.getToken().getSubject();
+      @AuthenticationPrincipal Jwt jwt) {
+    String userId = jwt.getSubject();
     return ResponseEntity.ok(swapCenterService.getMyReceivedSwapRequests(userId));
   }
 
   @GetMapping("/book/{bookId}/requests")
   public ResponseEntity<List<SwapResponseDto>> getSwapRequestsForBook(
-      @PathVariable String bookId, JwtAuthenticationToken authentication) {
-    String userId = authentication.getToken().getSubject();
+      @PathVariable String bookId, @AuthenticationPrincipal Jwt jwt) {
+    String userId = jwt.getSubject();
     return ResponseEntity.ok(swapCenterService.getSwapRequestsForBook(userId, bookId));
   }
 
   @PostMapping("/cancel/{swapId}")
   public ResponseEntity<SwapResponseDto> cancelSwapRequest(
-      @PathVariable String swapId, JwtAuthenticationToken authentication) {
-    String userId = authentication.getToken().getSubject();
+          @PathVariable String swapId,
+          @AuthenticationPrincipal Jwt jwt) {
+    String userId = jwt.getSubject();
     return ResponseEntity.ok(swapCenterService.cancelSwapRequest(swapId, userId));
   }
 
@@ -54,8 +55,10 @@ public class SwapCenterController {
 
   @PostMapping("/accept/{swapId}")
   public ResponseEntity<SwapResponseDto> acceptSwapRequest(
-      @PathVariable String swapId, Authentication authentication) {
-    String userId = authentication.getName();
+          @PathVariable String swapId,
+          @AuthenticationPrincipal Jwt jwt) {
+    String userId = jwt.getSubject();
     return ResponseEntity.ok(swapCenterService.acceptSwapRequest(swapId, userId));
   }
+
 }
