@@ -17,11 +17,11 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/BookSwap}
+          issuer-uri: ${FIREBASE_ISSUER_URI:https://securetoken.google.com/bookswap-26231}
 
 http:
-  timeoutMs: 2000
-  maxInMemoryMb: 16
+  timeoutMs: ${HTTP_TIMEOUT_MS:2000}
+  maxInMemoryMb: ${MAX_IN_MEMORY_MB:16}
 
 server:
   port: 8080

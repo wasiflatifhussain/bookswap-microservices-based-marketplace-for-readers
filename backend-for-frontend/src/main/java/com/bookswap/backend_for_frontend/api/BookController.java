@@ -11,7 +11,8 @@ import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -49,8 +50,8 @@ public class BookController {
   }
 
   @GetMapping("/me/get")
-  public ResponseEntity<List<BookCardDto>> getMyBooks(JwtAuthenticationToken authentication) {
-    String userId = authentication.getToken().getSubject();
+  public ResponseEntity<List<BookCardDto>> getMyBooks(@AuthenticationPrincipal Jwt jwt) {
+    String userId = jwt.getSubject();
     return ResponseEntity.ok(bookService.getMyBooks(userId));
   }
 

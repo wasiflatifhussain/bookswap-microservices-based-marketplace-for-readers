@@ -59,6 +59,22 @@ services:
     networks:
       - bookswap-net
 
+  backend-for-frontend:
+    build: ./backend-for-frontend
+    image: backend-for-frontend:latest
+    container_name: backend-for-frontend
+    ports:
+      - "8080:8080"
+    env_file: .env
+    depends_on:
+      - catalog-service
+      - media-service
+      - valuation-service
+      - wallet-service
+      - notification-service
+    networks:
+      - bookswap-net
+
 networks:
   bookswap-net:
     external: true
