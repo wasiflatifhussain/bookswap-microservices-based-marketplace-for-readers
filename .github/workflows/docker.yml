@@ -2,8 +2,6 @@ name: Build and Push Images
 
 on:
   push:
-#    branches:
-#      - main
 
 jobs:
   build:
@@ -23,6 +21,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       # Build and push multi-arch image
+      # catalog-service
       - name: Build and push catalog-service
         uses: docker/build-push-action@v5
         with:
@@ -30,3 +29,66 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: wasiflh/catalog-service:latest
+
+      # media-service
+      - name: Build and push media-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./media-service
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: wasiflh/media-service:latest
+
+      # valuation-service
+      - name: Build and push valuation-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./valuation-service
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: wasiflh/valuation-service:latest
+
+      # wallet-service
+      - name: Build and push wallet-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./wallet-service
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: wasiflh/wallet-service:latest
+
+      # swap-service
+      - name: Build and push swap-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./swap-service
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: wasiflh/swap-service:latest
+
+      # notification-service
+      - name: Build and push notification-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./notification-service
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: wasiflh/notification-service:latest
+
+      # email-service
+      - name: Build and push email-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./email-service
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: wasiflh/email-service:latest
+
+      # backend-for-frontend
+      - name: Build and push backend-for-frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend-for-frontend
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: wasiflh/backend-for-frontend:latest

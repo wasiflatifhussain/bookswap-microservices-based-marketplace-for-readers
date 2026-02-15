@@ -161,32 +161,12 @@ microservices even when some operations fail.
 
 ---
 
-## Service-to-Service Authentication
-
-The Swap Service performs S2S communication with other domain services like Catalog, Wallet, and others.
-It uses the service-service-comms client in Keycloak, which acts as a Service Roles client for authenticated internal
-service calls.
-
-### Configuration
-
-To allow Swap to read or write to other services:
-
-1. Go to the target service's client in Keycloak (e.g. bookswap-api for Catalog)
-2. Under Service Account Roles, grant the service-service-comms client the required roles:
-    - `catalog.read` for read access
-    - `catalog.write` for write access
-    - (and similarly for `wallet.read` / `wallet.write` / `wallet.delete` when connecting to Wallet)
-3. On the service-service-comms client, create an Audience mapper and include the target client (e.g. bookswap-api) so
-   that it appears under the `aud` claim in the token
-4. Keep "Add to access token" and "Add to token introspection" enabled
-
-Once this setup is done, Swap can securely communicate with other microservices without manual token passing or role
-checks in code — permissions are handled entirely through Keycloak service roles and audience configuration.
-
 ## VIP Improvements needed in the future:
+
 - P1 Task: When a responder unlists a books, then it posts BOOK_UNLISTED event. We need to
-  automatically cancel all pending swaps for that book and notify the requesters. Swap Service can listen to the event and
-  perform the cancellations and post SWAP_CANCELED events for notifications. 
+  automatically cancel all pending swaps for that book and notify the requesters. Swap Service can listen to the event
+  and
+  perform the cancellations and post SWAP_CANCELED events for notifications.
 - P1 Incident: We require rollbacks in service layer. As we are calling multiple external services, if any of them fail,
   we need to rollback the previous successful calls. Current use of @Transactional only covers local DB operations. We
   need to either implement a saga pattern with Kafka or retry mechanisms with idempotency keys. The main idea is that if
