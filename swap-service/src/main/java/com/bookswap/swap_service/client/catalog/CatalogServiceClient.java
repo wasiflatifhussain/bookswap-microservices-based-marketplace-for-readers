@@ -3,11 +3,10 @@ package com.bookswap.swap_service.client.catalog;
 import com.bookswap.swap_service.client.catalog.dto.BookRequest;
 import com.bookswap.swap_service.client.catalog.dto.BookResponseDetailed;
 import com.bookswap.swap_service.client.catalog.dto.BookResponseWithMedia;
-import com.bookswap.swap_service.security.ServiceTokenProvider;
+import com.bookswap.swap_service.config.ServiceEndpoints;
 import java.time.Duration;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -18,13 +17,10 @@ import reactor.core.publisher.Mono;
 @Slf4j
 public class CatalogServiceClient {
   private final WebClient catalogServiceWebClient;
-  private final ServiceTokenProvider serviceTokenProvider;
 
-  public CatalogServiceClient(
-      @Qualifier("catalogServiceWebClient") WebClient catalogServiceWebClient,
-      ServiceTokenProvider serviceTokenProvider) {
-    this.catalogServiceWebClient = catalogServiceWebClient;
-    this.serviceTokenProvider = serviceTokenProvider;
+  public CatalogServiceClient(WebClient.Builder builder, ServiceEndpoints serviceEndpoints) {
+
+    this.catalogServiceWebClient = builder.baseUrl(serviceEndpoints.getCatalog()).build();
   }
 
   public Mono<List<BookResponseWithMedia>> getBooksByBulkBookIdOrder(BookRequest bookRequest) {
@@ -34,7 +30,7 @@ public class CatalogServiceClient {
     // caught here. use reactive error handlers.
     return catalogServiceWebClient
         .post()
-        .uri("/books/bulk")
+        .uri("/api/catalog/books/bulk")
         .bodyValue(bookRequest)
         .exchangeToMono(
             resp -> {
@@ -77,7 +73,7 @@ public class CatalogServiceClient {
 
     return catalogServiceWebClient
         .get()
-        .uri("/books/{bookId}", bookId)
+        .uri("/api/catalog/books/{bookId}", bookId)
         .exchangeToMono(
             resp -> {
               if (resp.statusCode().is2xxSuccessful()) {
@@ -117,7 +113,7 @@ public class CatalogServiceClient {
 
     return catalogServiceWebClient
         .post()
-        .uri("/books/{bookId}/reserve", bookId)
+        .uri("/api/catalog/books/{bookId}/reserve", bookId)
         .retrieve()
         .onStatus(
             HttpStatusCode::is4xxClientError,
@@ -148,7 +144,7 @@ public class CatalogServiceClient {
 
     return catalogServiceWebClient
         .post()
-        .uri("/books/{bookId}/unreserve", bookId)
+        .uri("/api/catalog/books/{bookId}/unreserve", bookId)
         .retrieve()
         .onStatus(
             HttpStatusCode::is4xxClientError,
@@ -185,7 +181,7 @@ public class CatalogServiceClient {
         .uri(
             uriBuilder ->
                 uriBuilder
-                    .path("/books/confirm/swap")
+                    .path("/api/catalog/books/confirm/swap")
                     .queryParam("requesterBookId", requesterBookId)
                     .queryParam("responderBookId", responderBookId)
                     .build())

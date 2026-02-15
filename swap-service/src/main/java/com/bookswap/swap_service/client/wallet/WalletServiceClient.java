@@ -2,9 +2,9 @@ package com.bookswap.swap_service.client.wallet;
 
 import com.bookswap.swap_service.client.wallet.dto.WalletMutationRequest;
 import com.bookswap.swap_service.client.wallet.dto.WalletMutationResponse;
+import com.bookswap.swap_service.config.ServiceEndpoints;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -15,9 +15,9 @@ import reactor.core.publisher.Mono;
 public class WalletServiceClient {
   private final WebClient walletServiceWebClient;
 
-  public WalletServiceClient(
-      @Qualifier("walletServiceWebClient") WebClient walletServiceWebClient) {
-    this.walletServiceWebClient = walletServiceWebClient;
+  public WalletServiceClient(WebClient.Builder builder, ServiceEndpoints serviceEndpoints) {
+
+    this.walletServiceWebClient = builder.baseUrl(serviceEndpoints.getWallet()).build();
   }
 
   public Mono<WalletMutationResponse> reserveInRequestWallet(
@@ -26,7 +26,7 @@ public class WalletServiceClient {
 
     return walletServiceWebClient
         .post()
-        .uri("/{userId}/reserve", userId)
+        .uri("/api/wallet/{userId}/reserve", userId)
         .bodyValue(walletMutationRequest)
         .exchangeToMono(
             resp -> {
@@ -68,7 +68,7 @@ public class WalletServiceClient {
 
     return walletServiceWebClient
         .post()
-        .uri("/{userId}/release", userId)
+        .uri("/api/wallet/{userId}/release", userId)
         .bodyValue(walletMutationRequest)
         .exchangeToMono(
             resp -> {
@@ -110,7 +110,7 @@ public class WalletServiceClient {
 
     return walletServiceWebClient
         .post()
-        .uri("/{userId}/requester/confirm", userId)
+        .uri("/api/wallet/{userId}/requester/confirm", userId)
         .bodyValue(walletMutationRequest)
         .exchangeToMono(
             resp -> {
@@ -153,7 +153,7 @@ public class WalletServiceClient {
 
     return walletServiceWebClient
         .post()
-        .uri("/{userId}/responder/confirm", userId)
+        .uri("/api/wallet/{userId}/responder/confirm", userId)
         .bodyValue(walletMutationRequest)
         .exchangeToMono(
             resp -> {
