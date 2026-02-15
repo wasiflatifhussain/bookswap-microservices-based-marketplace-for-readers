@@ -1,7 +1,7 @@
 services:
   catalog-service:
     build: ./catalog-service
-    image: catalog-service:latest
+    image: wasiflh/catalog-service:latest
     container_name: catalog-service
     ports:
       - "8081:8081"
