@@ -52,10 +52,12 @@ public class SwapService {
             "No requests found for user with requesterUserId={} and swapStatus={}",
             requesterUserId,
             swapStatus);
-        return mapToSwapResponses(
-            List.of(Swap.builder().requesterUserId(requesterUserId).swapStatus(swapStatus).build()),
-            Map.of(),
-            "No requests found for user with this requesterId and swapStatus");
+        return List.of(
+            SwapResponse.builder()
+                .requesterUserId(requesterUserId)
+                .swapStatus(swapStatus)
+                .message("No requests found")
+                .build());
       }
 
       Set<String> bookIds = collectBookIds(swaps);
@@ -69,11 +71,13 @@ public class SwapService {
           "Error occurred while fetching requests for requesterUserId={} with swapStatus={} and error={}",
           requesterUserId,
           swapStatus,
-          e.getMessage());
-      return mapToSwapResponses(
-          List.of(Swap.builder().requesterUserId(requesterUserId).swapStatus(swapStatus).build()),
-          Map.of(),
-          "Error occurred while processing the request");
+          e);
+      return List.of(
+          SwapResponse.builder()
+              .requesterUserId(requesterUserId)
+              .swapStatus(swapStatus)
+              .message("Error occurred while processing the request")
+              .build());
     }
   }
 
@@ -92,10 +96,7 @@ public class SwapService {
             "No requests found for user with responderUserId={} and swapStatus={}",
             responderUserId,
             swapStatus);
-        return mapToSwapResponses(
-            List.of(Swap.builder().responderUserId(responderUserId).swapStatus(swapStatus).build()),
-            Map.of(),
-            "No requests found for user with this responderUserId and swapStatus");
+        return List.of(SwapResponse.builder().message("No requests found").build());
       }
 
       Set<String> bookIds = collectBookIds(swaps);
@@ -106,14 +107,16 @@ public class SwapService {
 
     } catch (Exception e) {
       log.error(
-          "Error occurred while fetching requests for responderUserId={} with swapStatus={} and error={}",
+          "Error occurred while fetching requests for responderUserId={} with swapStatus={}",
           responderUserId,
           swapStatus,
-          e.getMessage());
-      return mapToSwapResponses(
-          List.of(Swap.builder().responderUserId(responderUserId).swapStatus(swapStatus).build()),
-          Map.of(),
-          "Error occurred while processing the request");
+          e);
+      return List.of(
+          SwapResponse.builder()
+              .responderUserId(responderUserId)
+              .swapStatus(swapStatus)
+              .message("Error occurred while processing the request")
+              .build());
     }
   }
 
@@ -125,10 +128,7 @@ public class SwapService {
       List<Swap> swaps = swapRepository.findByResponderUserIdAndResponderBookId(userId, bookId);
       if (swaps.isEmpty()) {
         log.info("No requests found for userId={} and bookId={}", userId, bookId);
-        return mapToSwapResponses(
-            List.of(Swap.builder().requesterUserId(userId).responderUserId(userId).build()),
-            Map.of(),
-            "No requests found for user with this userId and bookId");
+        return List.of(SwapResponse.builder().message("No requests found").build());
       }
 
       Set<String> bookIds = collectBookIds(swaps);
@@ -137,14 +137,12 @@ public class SwapService {
 
     } catch (Exception e) {
       log.error(
-          "Error occurred while fetching requests for userId={} and bookId={} with error={}",
-          userId,
-          bookId,
-          e.getMessage());
-      return mapToSwapResponses(
-          List.of(Swap.builder().requesterUserId(userId).responderUserId(userId).build()),
-          Map.of(),
-          "Error occurred while processing the request");
+          "Error occurred while fetching requests for userId={} and bookId={}", userId, bookId, e);
+      return List.of(
+          SwapResponse.builder()
+              .requesterUserId(userId)
+              .message("Error occurred while processing the request")
+              .build());
     }
   }
 
@@ -672,20 +670,32 @@ public class SwapService {
 
   private List<SwapResponse> mapToSwapResponses(
       List<Swap> swaps, Map<String, BookResponseWithMedia> bookMap, String message) {
+
     return swaps.stream()
         .map(
-            s ->
-                SwapResponse.builder()
-                    .swapId(s.getSwapId())
-                    .requesterUserId(s.getRequesterUserId())
-                    .responderUserId(s.getResponderUserId())
-                    .requesterBookId(s.getRequesterBookId())
-                    .responderBookId(s.getResponderBookId())
-                    .swapStatus(s.getSwapStatus())
-                    .requesterBook(bookMap.get(s.getRequesterBookId()))
-                    .responderBook(bookMap.get(s.getResponderBookId()))
-                    .message(message)
-                    .build())
+            s -> {
+              BookResponseWithMedia requesterBook = null;
+              if (s.getRequesterBookId() != null) {
+                requesterBook = bookMap.get(s.getRequesterBookId());
+              }
+
+              BookResponseWithMedia responderBook = null;
+              if (s.getResponderBookId() != null) {
+                responderBook = bookMap.get(s.getResponderBookId());
+              }
+
+              return SwapResponse.builder()
+                  .swapId(s.getSwapId())
+                  .requesterUserId(s.getRequesterUserId())
+                  .responderUserId(s.getResponderUserId())
+                  .requesterBookId(s.getRequesterBookId())
+                  .responderBookId(s.getResponderBookId())
+                  .swapStatus(s.getSwapStatus())
+                  .requesterBook(requesterBook)
+                  .responderBook(responderBook)
+                  .message(message)
+                  .build();
+            })
         .toList();
   }
 }

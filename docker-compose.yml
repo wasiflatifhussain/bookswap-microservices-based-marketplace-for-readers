@@ -39,13 +39,16 @@ services:
     networks:
       - bookswap-net
 
-  email-service:
-    build: ./email-service
-    image: email-service:latest
-    container_name: email-service
+  swap-service:
+    build: ./swap-service
+    image: swap-service:latest
+    container_name: swap-service
     ports:
       - "8085:8085"
     env_file: .env
+    depends_on:
+      - catalog-service
+      - wallet-service
     networks:
       - bookswap-net
 
@@ -55,6 +58,16 @@ services:
     container_name: notification-service
     ports:
       - "8086:8086"
+    env_file: .env
+    networks:
+      - bookswap-net
+
+  email-service:
+    build: ./email-service
+    image: email-service:latest
+    container_name: email-service
+    ports:
+      - "8087:8087"
     env_file: .env
     networks:
       - bookswap-net

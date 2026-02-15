@@ -42,3 +42,6 @@ email:
   resend:
     api-key: ${RESEND_API_KEY}
     from-address: "BookSwap <no-reply@bookswap.work>"
+
+server:
+  port: 8087
