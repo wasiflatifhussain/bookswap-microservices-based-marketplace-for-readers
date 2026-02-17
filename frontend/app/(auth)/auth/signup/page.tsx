@@ -41,20 +41,16 @@ export default function SignupPage() {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const idToken = await cred.user.getIdToken();
 
-      await fetch("/api/auth/login", {
+      await fetch("/api/bff/auth/login", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
+        headers: { Authorization: `Bearer ${idToken}` },
+        credentials: "include",
       });
 
       router.replace("/");
     } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError("Login failed");
-      }
+      if (e instanceof Error) setError(e.message);
+      else setError("Signup failed");
     } finally {
       setLoading(false);
     }

@@ -1,32 +1,43 @@
-const BFF_BASE_URL = process.env.NEXT_PUBLIC_BFF_URL ?? "";
+import { headers } from "next/headers";
 
 export async function bffFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(`${BFF_BASE_URL}${path}`, {
+  let url = path;
+  let cookieHeader: string | undefined;
+
+  // Server-side: build absolute URL + forward cookies
+  if (typeof window === "undefined") {
+    const hdrs = await headers();
+    const host = hdrs.get("host");
+    const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+
+    if (!host) {
+      throw new Error("Cannot determine host for server-side fetch");
+    }
+
+    url = `${protocol}://${host}${path}`;
+    cookieHeader = hdrs.get("cookie") ?? undefined;
+  }
+
+  // Since server-side fetch does not automatically include cookies, forward them manually
+  const res = await fetch(url, {
     ...options,
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
       ...options?.headers,
     },
     cache: "no-store",
   });
 
-  // TODO: Uncomment after Auth integration and handle 401 globally
-  // if (!res.ok) {
-  //   throw new Error(`BFF request failed: ${res.status}`);
-  // }
+  if (res.status === 401) {
+    // Let layouts/pages decide what to do
+    throw new Error("UNAUTHENTICATED");
+  }
 
-  // TODO: Remove after Auth integration
   if (!res.ok) {
-    // DEV fallback only
-    if (process.env.NODE_ENV === "development") {
-      console.warn(`[DEV] BFF request failed: ${path}`);
-      throw new Error("DEV_BFF_UNAVAILABLE");
-    }
-
     throw new Error(`BFF request failed: ${res.status}`);
   }
 
