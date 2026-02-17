@@ -32,7 +32,10 @@ public class NavbarService {
 
     try {
       walletDto = walletClient.getMyBalance();
-      log.info("Successfully fetched wallet balance for user={}", userId);
+      log.info(
+          "Successfully fetched wallet balance for user={} with balance={}",
+          userId,
+          walletDto.getAvailableAmount());
     } catch (Exception e) {
       log.error("Failed to fetch wallet balance for user={} with error={}", userId, e.getMessage());
       errors.add("wallet");
@@ -40,7 +43,10 @@ public class NavbarService {
 
     try {
       unreadNotifications = notificationClient.getUnreadCount();
-      log.info("Successfully fetched unread notifications count for user={}", userId);
+      log.info(
+          "Successfully fetched unread notifications count for user={} with count={}",
+          userId,
+          unreadNotifications);
     } catch (Exception e) {
       log.error(
           "Failed to fetch unread notifications count for userId={} with error={}",
