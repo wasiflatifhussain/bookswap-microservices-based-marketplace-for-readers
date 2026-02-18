@@ -10,3 +10,12 @@ export interface NavbarSnapshot {
   status: "OK" | "PARTIAL" | "FAILED";
   message: string;
 }
+
+export interface NavbarNotification {
+  notificationId: string;
+  userId: string;
+  notificationType: string;
+  title: string;
+  description: string;
+  readStatus: "READ" | "UNREAD";
+}
