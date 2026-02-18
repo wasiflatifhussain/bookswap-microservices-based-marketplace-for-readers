@@ -72,6 +72,7 @@ public class HomeFeedService {
                 .valuation(b.getValuation())
                 .bookStatus(b.getBookStatus())
                 .thumbnailUrl(thumbnailUrl)
+                .ownerUserId(b.getOwnerUserId())
                 .build();
 
         feedItemsList.add(item);

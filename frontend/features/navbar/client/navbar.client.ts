@@ -3,11 +3,12 @@ import { NavbarNotification } from "../types";
 export async function fetchNavbarNotifications(): Promise<
   NavbarNotification[]
 > {
-  const res = await fetch("/api/bff/navbar/notifications", {
+  const res = await fetch("/api/bff/navbar/notifications?unreadOnly=true", {
     method: "GET",
     credentials: "include",
     cache: "no-store",
   });
+
   if (!res.ok) throw new Error(`notifications failed: ${res.status}`);
   return res.json();
 }

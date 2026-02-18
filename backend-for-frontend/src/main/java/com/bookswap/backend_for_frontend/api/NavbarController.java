@@ -33,7 +33,7 @@ public class NavbarController {
   public ResponseEntity<List<NotificationDto>> getNotifications(
       @RequestParam(name = "unreadOnly", defaultValue = "false") boolean unreadOnly,
       @RequestParam(name = "page", defaultValue = "0") int page,
-      @RequestParam(name = "size", defaultValue = "20") int size) {
+      @RequestParam(name = "size", defaultValue = "10") int size) {
     return ResponseEntity.ok(navbarService.getNotifications(unreadOnly, page, size));
   }
 
