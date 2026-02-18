@@ -10,6 +10,23 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "bookswap-media-bucket.s3.ap-southeast-1.amazonaws.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.amazonaws.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.cloudfront.net",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

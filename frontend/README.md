@@ -283,6 +283,8 @@ This phase validates:
 - Book selector (carousel-style)
 - Final confirmation step
 
+### Phase 8 — Polling/WebSockets for Notifications
+
 ---
 
 ## Running the App

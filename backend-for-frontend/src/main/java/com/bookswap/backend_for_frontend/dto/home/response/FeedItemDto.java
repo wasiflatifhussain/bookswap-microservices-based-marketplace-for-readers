@@ -19,4 +19,5 @@ public class FeedItemDto {
   private Float valuation;
   private String bookStatus;
   private String thumbnailUrl;
+  private String ownerUserId;
 }

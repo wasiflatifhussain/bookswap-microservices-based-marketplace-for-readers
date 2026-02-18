@@ -1,10 +1,12 @@
-export default function HomePage() {
-  return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Welcome to BookSwap</h1>
-      <p className="mt-2 text-muted-foreground">
-        Discover books and trade with other readers.
-      </p>
-    </main>
-  );
+import { HomeFeed } from "@/features/home/components/HomeFeed";
+import { getHomeFeed } from "@/features/home/server/home.api";
+import { getNavbarSnapshot } from "@/features/navbar/server/navbar.api";
+
+export default async function HomePage() {
+  const [books, snapshot] = await Promise.all([
+    getHomeFeed(20),
+    getNavbarSnapshot(),
+  ]);
+
+  return <HomeFeed books={books} currentUserId={snapshot.userId} />;
 }
