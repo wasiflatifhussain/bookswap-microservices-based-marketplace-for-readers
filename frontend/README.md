@@ -297,3 +297,7 @@ Visit:
 [http://localhost:3000](http://localhost:3000)
 
 ---
+
+### Important Future Updates
+
+- Add pagination to home feed and library pages - fetch incrementally - might require BFF support
