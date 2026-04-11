@@ -1,23 +1,42 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { StatPill } from "@/components/ui/stat-pill";
 import { FeedItem } from "@/features/home/types";
+import { LibraryBook } from "@/features/library/types";
 import Image from "next/image";
 import Link from "next/link";
 
+type CardItem = FeedItem | LibraryBook;
+
 interface Props {
-  item: FeedItem;
-  currentUserId: string;
+  item: CardItem;
+  currentUserId?: string;
+  mode?: "feed" | "library";
+  onDelete?: (bookId: string) => void;
+  deleting?: boolean;
 }
 
-export function BookCard({ item, currentUserId }: Props) {
-  const isOwnedByUser = item.ownerUserId === currentUserId;
+function formatCoins(value: number | null | undefined): string {
+  return typeof value === "number" ? value.toFixed(2) : "0.00";
+}
+
+export function BookCard({
+  item,
+  currentUserId,
+  mode = "feed",
+  onDelete,
+  deleting = false,
+}: Props) {
+  const isFeedItem = "ownerUserId" in item;
+  const isOwnedByUser =
+    isFeedItem && currentUserId ? item.ownerUserId === currentUserId : false;
 
   return (
-    <Card className="p-4 md:p-6">
+    <Card className="surface-card rounded-md p-4 md:p-6">
       {/* OUTER GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-[30%_70%] gap-4 md:gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[30%_70%] md:gap-6">
         {/* IMAGE */}
-        <div className="relative w-full aspect-[4/3] md:aspect-[1] overflow-hidden rounded-lg bg-muted">
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md bg-muted md:aspect-[1]">
           {item.thumbnailUrl ? (
             <Image
               src={item.thumbnailUrl}
@@ -40,21 +59,24 @@ export function BookCard({ item, currentUserId }: Props) {
           {/* TEXT */}
           <div className="space-y-2 text-sm">
             <div>
-              <span className="font-medium">Title:</span> {item.title}
+              <span className="font-medium text-primary/90">Title:</span>{" "}
+              {item.title}
             </div>
             <div>
-              <span className="font-medium">Author:</span> {item.author}
+              <span className="font-medium text-primary/90">Author:</span>{" "}
+              {item.author}
             </div>
             <div>
-              <span className="font-medium">Genre:</span> {item.genre}
+              <span className="font-medium text-primary/90">Genre:</span>{" "}
+              {item.genre}
             </div>
             <div>
-              <span className="font-medium">Condition:</span>{" "}
+              <span className="font-medium text-primary/90">Condition:</span>{" "}
               {item.bookCondition}
             </div>
             <div>
-              <span className="font-medium">Value:</span>{" "}
-              {item.valuation.toFixed(2)} BookCoins
+              <span className="font-medium text-primary/90">Value:</span>{" "}
+              <StatPill>{formatCoins(item.valuation)} BookCoins</StatPill>
             </div>
             <div className="text-muted-foreground line-clamp-3">
               <span className="font-medium text-foreground">Description:</span>{" "}
@@ -68,17 +90,28 @@ export function BookCard({ item, currentUserId }: Props) {
               <Link href={`/book/${item.bookId}`}>View Book</Link>
             </Button>
 
-            <Button
-              disabled={isOwnedByUser}
-              title={
-                isOwnedByUser
-                  ? "You cannot swap your own book"
-                  : "Send swap request"
-              }
-              className="w-full md:w-auto"
-            >
-              Send Swap Request
-            </Button>
+            {mode === "library" ? (
+              <Button
+                variant="destructive"
+                onClick={() => onDelete?.(item.bookId)}
+                disabled={deleting}
+                className="w-full md:w-auto"
+              >
+                {deleting ? "Deleting..." : "Delete Listing"}
+              </Button>
+            ) : (
+              <Button
+                disabled={isOwnedByUser}
+                title={
+                  isOwnedByUser
+                    ? "You cannot swap your own book"
+                    : "Send swap request"
+                }
+                className="w-full md:w-auto"
+              >
+                Send Swap Request
+              </Button>
+            )}
           </div>
         </div>
       </div>

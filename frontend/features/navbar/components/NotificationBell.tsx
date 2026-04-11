@@ -13,7 +13,7 @@ export function NotificationBell({ unreadCount, onToggle }: Props) {
   return (
     <button
       onClick={onToggle}
-      className="relative rounded-full p-2 hover:bg-accent"
+      className="relative rounded-sm p-2 transition-colors hover:bg-accent/60"
     >
       <Bell className="h-5 w-5" />
 

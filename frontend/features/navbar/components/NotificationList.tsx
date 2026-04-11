@@ -26,9 +26,8 @@ export function NotificationList({
         w-[80vw]
         max-w-md
         rounded-md
-        border
-        bg-background
-        shadow
+        border border-border
+        bg-card
         right-0
         translate-x-[10%]
         max-h-[60vh]
@@ -44,8 +43,8 @@ export function NotificationList({
           flex
           items-center
           justify-between
-          border-b
-          bg-background
+          border-b border-border/70
+          bg-card
           px-4
           py-3
           text-sm
@@ -54,7 +53,7 @@ export function NotificationList({
         <p className="font-medium">Unread Notifications</p>
         <button
           onClick={onClose}
-          className="text-xs text-muted-foreground hover:underline"
+          className="text-xs text-muted-foreground transition-colors hover:text-foreground hover:underline"
         >
           Close
         </button>
@@ -71,7 +70,7 @@ export function NotificationList({
             {notifications.map((n) => (
               <li
                 key={n.notificationId}
-                className="flex items-start justify-between gap-3 rounded-md bg-muted/50 px-3 py-2"
+                className="flex items-start justify-between gap-3 rounded-sm border border-border bg-muted/45 px-3 py-2"
               >
                 <div>
                   <p className="font-medium leading-snug">{n.title}</p>
@@ -84,7 +83,7 @@ export function NotificationList({
 
                 <button
                   onClick={() => onMarkRead(n.notificationId)}
-                  className="mt-1 rounded-md p-1 text-muted-foreground hover:bg-gray-300 hover:text-foreground"
+                  className="mt-1 rounded-sm p-1 text-muted-foreground hover:bg-gray-300 hover:text-foreground"
                   title="Mark as read"
                 >
                   <CircleCheck className="h-4 w-4" />

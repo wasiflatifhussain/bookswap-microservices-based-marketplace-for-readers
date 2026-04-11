@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <Navbar snapshot={snapshot} />
-      {children}
+      <main className="pb-10 pt-4">{children}</main>
     </>
   );
 }
