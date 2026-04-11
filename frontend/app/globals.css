@@ -48,25 +48,25 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --radius: 0.3rem;
+  --background: oklch(0.98 0.01 95);
+  --foreground: oklch(0.28 0.03 36);
+  --card: oklch(0.995 0.006 95);
+  --card-foreground: oklch(0.28 0.03 36);
+  --popover: oklch(0.995 0.006 95);
+  --popover-foreground: oklch(0.28 0.03 36);
+  --primary: oklch(0.45 0.08 160);
+  --primary-foreground: oklch(0.99 0.004 95);
+  --secondary: oklch(0.95 0.02 95);
+  --secondary-foreground: oklch(0.34 0.04 36);
+  --muted: oklch(0.96 0.012 95);
+  --muted-foreground: oklch(0.52 0.02 45);
+  --accent: oklch(0.9 0.05 85);
+  --accent-foreground: oklch(0.32 0.05 36);
+  --destructive: oklch(0.6 0.2 28);
+  --border: oklch(0.88 0.02 90);
+  --input: oklch(0.92 0.015 95);
+  --ring: oklch(0.55 0.09 160);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -122,5 +122,31 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at 10% 0%, oklch(0.92 0.04 85 / 0.35), transparent 38%),
+      radial-gradient(circle at 90% 20%, oklch(0.95 0.03 155 / 0.3), transparent 42%),
+      linear-gradient(140deg, oklch(0.99 0.008 96), oklch(0.97 0.012 90));
+  }
+}
+
+@layer components {
+  .page-wrap {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-title {
+    @apply text-3xl font-semibold tracking-tight text-foreground;
+  }
+
+  .section-subtitle {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .surface-card {
+    @apply border border-border bg-card/95;
+  }
+
+  .input-field {
+    @apply h-11 w-full rounded-sm border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20;
   }
 }

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { StatPill } from "@/components/ui/stat-pill";
 import { FeedItem } from "@/features/home/types";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,11 +14,11 @@ export function BookCard({ item, currentUserId }: Props) {
   const isOwnedByUser = item.ownerUserId === currentUserId;
 
   return (
-    <Card className="p-4 md:p-6">
+    <Card className="surface-card rounded-md p-4 md:p-6">
       {/* OUTER GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-[30%_70%] gap-4 md:gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[30%_70%] md:gap-6">
         {/* IMAGE */}
-        <div className="relative w-full aspect-[4/3] md:aspect-[1] overflow-hidden rounded-lg bg-muted">
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md bg-muted md:aspect-[1]">
           {item.thumbnailUrl ? (
             <Image
               src={item.thumbnailUrl}
@@ -40,21 +41,26 @@ export function BookCard({ item, currentUserId }: Props) {
           {/* TEXT */}
           <div className="space-y-2 text-sm">
             <div>
-              <span className="font-medium">Title:</span> {item.title}
+              <span className="font-medium text-primary/90">Title:</span>{" "}
+              {item.title}
             </div>
             <div>
-              <span className="font-medium">Author:</span> {item.author}
+              <span className="font-medium text-primary/90">Author:</span>{" "}
+              {item.author}
             </div>
             <div>
-              <span className="font-medium">Genre:</span> {item.genre}
+              <span className="font-medium text-primary/90">Genre:</span>{" "}
+              {item.genre}
             </div>
             <div>
-              <span className="font-medium">Condition:</span>{" "}
+              <span className="font-medium text-primary/90">Condition:</span>{" "}
               {item.bookCondition}
             </div>
             <div>
-              <span className="font-medium">Value:</span>{" "}
-              {item.valuation.toFixed(2)} BookCoins
+              <span className="font-medium text-primary/90">Value:</span>{" "}
+              <StatPill>
+                {item.valuation.toFixed(2)} BookCoins
+              </StatPill>
             </div>
             <div className="text-muted-foreground line-clamp-3">
               <span className="font-medium text-foreground">Description:</span>{" "}

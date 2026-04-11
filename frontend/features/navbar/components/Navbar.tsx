@@ -76,26 +76,32 @@ export function Navbar({ snapshot }: NavbarProps) {
   }, [mobileOpen]);
 
   return (
-    <header className="relative z-40 border-b bg-background">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-card/90 backdrop-blur-md">
+      <div className="page-wrap flex h-16 items-center justify-between">
         {/* LEFT */}
-        <Link href="/" className="text-lg font-semibold">
-          BookSwap
+        <Link href="/" className="text-lg font-semibold tracking-tight">
+          BookSwap <span className="text-primary">Marketplace</span>
         </Link>
 
         {/* RIGHT */}
         <div className="flex items-center gap-4">
           {/* DESKTOP NAV */}
           <nav className="hidden items-center gap-6 md:flex">
-            <Link href="/library" className="text-sm font-medium">
+            <Link
+              href="/library"
+              className="text-sm font-medium text-foreground/85 transition-colors hover:text-foreground"
+            >
               My Library
             </Link>
 
-            <Link href="/swap" className="text-sm font-medium">
+            <Link
+              href="/swap"
+              className="text-sm font-medium text-foreground/85 transition-colors hover:text-foreground"
+            >
               Swap Center
             </Link>
 
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1 rounded-sm bg-muted/70 px-2.5 py-1 text-sm text-muted-foreground">
               <Image
                 src="/bc-logo.png"
                 alt="BC"
@@ -128,7 +134,7 @@ export function Navbar({ snapshot }: NavbarProps) {
 
             <button
               onClick={handleLogout}
-              className="text-sm text-red-500 hover:underline"
+              className="text-sm text-destructive transition-colors hover:underline"
             >
               Logout
             </button>
@@ -136,7 +142,7 @@ export function Navbar({ snapshot }: NavbarProps) {
 
           {/* MOBILE ICONS */}
           <div className="flex items-center gap-3 md:hidden">
-            <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1 rounded-sm bg-muted/70 px-2 py-1 text-sm text-muted-foreground">
               <Image
                 src="/bc-logo.png"
                 alt="BC"
@@ -167,7 +173,7 @@ export function Navbar({ snapshot }: NavbarProps) {
 
             <button
               onClick={() => setMobileOpen(true)}
-              className="rounded-md p-2 hover:bg-accent"
+              className="rounded-sm p-2 transition-colors hover:bg-accent"
             >
               ☰
             </button>
@@ -179,16 +185,16 @@ export function Navbar({ snapshot }: NavbarProps) {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
-            className="absolute inset-0 bg-black/30"
+            className="absolute inset-0 bg-black/25 backdrop-blur-[1px]"
             onClick={() => setMobileOpen(false)}
           />
 
-          <div className="absolute right-0 top-0 h-full w-64 bg-background shadow-lg">
+          <div className="absolute right-0 top-0 h-full w-72 border-l border-border/70 bg-card">
             <div className="space-y-4 px-4 py-6 text-sm">
               <Link
                 href="/library"
                 onClick={() => setMobileOpen(false)}
-                className="block font-medium"
+                className="block rounded-sm px-2 py-2 font-medium hover:bg-accent/50"
               >
                 My Library
               </Link>
@@ -196,7 +202,7 @@ export function Navbar({ snapshot }: NavbarProps) {
               <Link
                 href="/swap"
                 onClick={() => setMobileOpen(false)}
-                className="block font-medium"
+                className="block rounded-sm px-2 py-2 font-medium hover:bg-accent/50"
               >
                 Swap Center
               </Link>
@@ -207,7 +213,7 @@ export function Navbar({ snapshot }: NavbarProps) {
 
               <button
                 onClick={handleLogout}
-                className="block text-left text-red-500 hover:underline"
+                className="block text-left text-destructive hover:underline"
               >
                 Logout
               </button>
