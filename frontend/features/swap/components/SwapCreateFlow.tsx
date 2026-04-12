@@ -3,6 +3,14 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  type CarouselApi,
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import {
   Dialog,
   DialogContent,
   DialogTitle,
@@ -13,7 +21,7 @@ import { BookDetail } from "@/features/catalog/types";
 import { FeedItem } from "@/features/home/types";
 import { LibraryBook } from "@/features/library/types";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface SwapCreateFlowProps {
   targetBook?: BookDetail;
@@ -25,7 +33,10 @@ interface SwapCreateFlowProps {
 interface TargetBookOption {
   bookId: string;
   title: string;
+  description: string;
+  genre: string;
   author: string;
+  bookCondition: string;
   valuation: number;
   bookStatus: string;
   thumbnailUrl: string | null;
@@ -34,6 +45,15 @@ interface TargetBookOption {
 
 function formatCoins(value: number | null | undefined): string {
   return typeof value === "number" ? value.toFixed(2) : "0.00";
+}
+
+function formatEnumLabel(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function SelectionCard({
@@ -104,6 +124,146 @@ function SelectionCard({
   );
 }
 
+interface ModalPickerBook {
+  bookId: string;
+  title: string;
+  description: string;
+  genre: string;
+  author: string;
+  bookCondition: string;
+  valuation: number;
+  thumbnailUrl: string | null;
+  bookStatus?: string;
+}
+
+function ModalCarouselPicker({
+  books,
+  selectedBookId,
+  onSelect,
+  actionLabel,
+}: {
+  books: ModalPickerBook[];
+  selectedBookId: string | null;
+  onSelect: (bookId: string) => void;
+  actionLabel: string;
+}) {
+  const [api, setApi] = useState<CarouselApi>();
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (!api) return;
+
+    const onChange = () => {
+      setCurrentIndex(api.selectedScrollSnap());
+    };
+
+    onChange();
+    api.on("select", onChange);
+    api.on("reInit", onChange);
+
+    return () => {
+      api.off("select", onChange);
+      api.off("reInit", onChange);
+    };
+  }, [api]);
+
+  return (
+    <div className="space-y-4">
+      <Carousel setApi={setApi} className="w-full" opts={{ align: "center" }}>
+        <CarouselContent>
+          {books.map((book) => (
+            <CarouselItem key={book.bookId} className="basis-full">
+              <Card className="surface-card rounded-md p-5 md:p-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-[45%_55%]">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md bg-muted md:aspect-[1]">
+                    {book.thumbnailUrl ? (
+                      <Image
+                        src={book.thumbnailUrl}
+                        alt={book.title}
+                        fill
+                        unoptimized
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 45vw"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                        No image
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4 pr-1 md:pr-3">
+                    <p className="line-clamp-2 text-xl font-semibold tracking-tight">
+                      {book.title}
+                    </p>
+                    <dl className="grid grid-cols-[110px_1fr] gap-y-2 text-sm">
+                      <dt className="font-medium text-primary/90">Author</dt>
+                      <dd>{book.author || "-"}</dd>
+                      <dt className="font-medium text-primary/90">Genre</dt>
+                      <dd>{formatEnumLabel(book.genre)}</dd>
+                      <dt className="font-medium text-primary/90">Condition</dt>
+                      <dd>{formatEnumLabel(book.bookCondition)}</dd>
+                      <dt className="font-medium text-primary/90">Status</dt>
+                      <dd>{formatEnumLabel(book.bookStatus)}</dd>
+                      <dt className="font-medium text-primary/90">Value</dt>
+                      <dd>
+                        <StatPill>{formatCoins(book.valuation)} BookCoins</StatPill>
+                      </dd>
+                    </dl>
+                    <div className="border-t border-border pt-4">
+                      <p className="mb-1 text-sm font-medium text-primary/90">
+                        Description
+                      </p>
+                      <p className="line-clamp-4 text-sm leading-relaxed text-muted-foreground">
+                        {book.description || "No description provided."}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={
+                        selectedBookId === book.bookId ? "secondary" : "outline"
+                      }
+                      className="h-10 px-4"
+                      onClick={() => onSelect(book.bookId)}
+                    >
+                      {selectedBookId === book.bookId ? "Selected" : actionLabel}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+
+        {books.length > 1 ? (
+          <>
+            <CarouselPrevious className="-left-2 top-1/2 h-10 w-10 -translate-y-1/2 border-border bg-card" />
+            <CarouselNext className="-right-2 top-1/2 h-10 w-10 -translate-y-1/2 border-border bg-card" />
+          </>
+        ) : null}
+      </Carousel>
+
+      {books.length > 1 ? (
+        <div className="flex items-center justify-center gap-2">
+          {books.map((book, index) => (
+            <button
+              key={`dot-${book.bookId}`}
+              type="button"
+              onClick={() => api?.scrollTo(index)}
+              aria-label={`Go to slide ${index + 1}`}
+              className={
+                index === currentIndex
+                  ? "h-2.5 w-2.5 rounded-full bg-foreground"
+                  : "h-2.5 w-2.5 rounded-full bg-muted-foreground/30"
+              }
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SwapCreateFlow({
   targetBook,
   recentBooks,
@@ -138,7 +298,10 @@ export function SwapCreateFlow({
         .map((book) => ({
           bookId: book.bookId,
           title: book.title,
+          description: book.description,
+          genre: book.genre,
           author: book.author,
+          bookCondition: book.bookCondition,
           valuation: book.valuation,
           bookStatus: book.bookStatus,
           thumbnailUrl: book.thumbnailUrl,
@@ -235,7 +398,7 @@ export function SwapCreateFlow({
               <div className="flex flex-wrap items-center gap-2">
                 <StatPill>{formatCoins(selectedTarget.valuation)} BookCoins</StatPill>
                 <StatPill className="bg-muted">
-                  {selectedTarget.bookStatus || "UNKNOWN"}
+                  {formatEnumLabel(selectedTarget.bookStatus)}
                 </StatPill>
               </div>
             </div>
@@ -251,36 +414,31 @@ export function SwapCreateFlow({
                 Choose from recent books
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[98vw] max-w-6xl p-0">
+            <DialogContent className="h-[92vh] w-[99.5vw] max-w-[2200px] p-0">
               <div className="border-b border-border px-6 py-5 sm:px-7">
                 <DialogTitle className="text-xl tracking-tight">Select Target Book</DialogTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Pick a recent listing you want to request.
                 </p>
               </div>
-              <div className="max-h-[68vh] space-y-4 overflow-y-auto px-6 py-5 pr-4 sm:px-7">
+              <div className="max-h-[80vh] space-y-4 overflow-y-auto px-6 py-5 pr-4 sm:px-7">
                 {targetOptions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No recent books available to request right now.
                   </p>
                 ) : (
-                  targetOptions.map((book) => (
-                    <SelectionCard
-                      key={book.bookId}
-                      title={book.title}
-                      author={book.author}
-                      valuation={book.valuation}
-                      imageUrl={book.thumbnailUrl}
-                      size="modal"
-                      selected={selectedTarget?.bookId === book.bookId}
-                      buttonText="Select target"
-                      onSelect={() => {
-                        setSelectedTarget(book);
-                        setSelectedBookId(null);
-                        setTargetModalOpen(false);
-                      }}
-                    />
-                  ))
+                  <ModalCarouselPicker
+                    books={targetOptions}
+                    selectedBookId={selectedTarget?.bookId ?? null}
+                    actionLabel="Select target book"
+                    onSelect={(bookId) => {
+                      const next = targetOptions.find((item) => item.bookId === bookId);
+                      if (!next) return;
+                      setSelectedTarget(next);
+                      setSelectedBookId(null);
+                      setTargetModalOpen(false);
+                    }}
+                  />
                 )}
               </div>
             </DialogContent>
@@ -318,35 +476,28 @@ export function SwapCreateFlow({
                 Choose from all my books
               </Button>
             </DialogTrigger>
-            <DialogContent className="w-[98vw] max-w-6xl p-0">
+            <DialogContent className="h-[92vh] w-[99.5vw] max-w-[2200px] p-0">
               <div className="border-b border-border px-6 py-5 sm:px-7">
                 <DialogTitle className="text-xl tracking-tight">Select Offered Book</DialogTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Choose which of your available books you want to offer.
                 </p>
               </div>
-              <div className="max-h-[68vh] space-y-4 overflow-y-auto px-6 py-5 pr-4 sm:px-7">
+              <div className="max-h-[80vh] space-y-4 overflow-y-auto px-6 py-5 pr-4 sm:px-7">
                 {availableBooks.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     You do not have any available books to offer right now.
                   </p>
                 ) : (
-                  availableBooks.map((book) => (
-                    <SelectionCard
-                      key={book.bookId}
-                      title={book.title}
-                      author={book.author}
-                      valuation={book.valuation}
-                      imageUrl={book.thumbnailUrl}
-                      size="modal"
-                      selected={selectedBookId === book.bookId}
-                      buttonText="Select this book"
-                      onSelect={() => {
-                        setSelectedBookId(book.bookId);
-                        setOfferedModalOpen(false);
-                      }}
-                    />
-                  ))
+                  <ModalCarouselPicker
+                    books={availableBooks}
+                    selectedBookId={selectedBookId}
+                    actionLabel="Select this book"
+                    onSelect={(bookId) => {
+                      setSelectedBookId(bookId);
+                      setOfferedModalOpen(false);
+                    }}
+                  />
                 )}
               </div>
             </DialogContent>
