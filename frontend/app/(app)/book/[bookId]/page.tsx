@@ -43,7 +43,9 @@ export default async function BookDetailPage({ params }: BookDetailPageProps) {
     notFound();
   }
 
-  const filteredMatches = matches.filter((match) => match.bookId !== book.bookId);
+  const filteredMatches = matches.filter(
+    (match) => Boolean(match?.bookId) && match.bookId !== book.bookId,
+  );
 
   return (
     <PageContainer className="space-y-8 py-6">

@@ -87,6 +87,7 @@ export function BookImageCarousel({ title, mediaUrls }: BookImageCarouselProps) 
                 src={url}
                 alt={`${title} image ${index + 1}`}
                 fill
+                unoptimized
                 className="object-cover transition-transform duration-200 hover:scale-[1.02]"
                 sizes="(max-width: 768px) 100vw, 40vw"
               />
@@ -129,6 +130,7 @@ export function BookImageCarousel({ title, mediaUrls }: BookImageCarouselProps) 
               alt={`${title} image ${viewerIndex + 1}`}
               width={1800}
               height={1200}
+              unoptimized
               className="mx-auto max-h-[80vh] w-auto object-contain"
             />
           </div>

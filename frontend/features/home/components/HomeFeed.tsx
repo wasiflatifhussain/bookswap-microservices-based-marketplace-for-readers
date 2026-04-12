@@ -10,10 +10,14 @@ interface Props {
 }
 
 export function HomeFeed({ books, currentUserId }: Props) {
-  if (books.length === 0) {
+  const validBooks = books.filter(
+    (book) => Boolean(book.bookId) && Boolean(book.title),
+  );
+
+  if (validBooks.length === 0) {
     return (
       <PageContainer className="py-10">
-        <EmptyState message="No books available right now." />
+        <EmptyState title="No books found" message="No books found." />
       </PageContainer>
     );
   }
@@ -25,7 +29,7 @@ export function HomeFeed({ books, currentUserId }: Props) {
         subtitle="Curated listings from the BookSwap community."
       />
 
-      {books.map((book) => (
+      {validBooks.map((book) => (
         <BookCard key={book.bookId} item={book} currentUserId={currentUserId} />
       ))}
     </PageContainer>

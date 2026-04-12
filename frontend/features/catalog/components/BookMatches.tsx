@@ -1,4 +1,3 @@
-import { EmptyState } from "@/components/states/EmptyState";
 import { Card } from "@/components/ui/card";
 import { StatPill } from "@/components/ui/stat-pill";
 import { BookMatchCard } from "@/features/catalog/types";
@@ -14,18 +13,15 @@ function formatCoins(value: number | null | undefined): string {
 }
 
 export function BookMatches({ items }: BookMatchesProps) {
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        title="No close matches yet"
-        message="Try again later or broaden match tolerance in future iterations."
-      />
-    );
+  const validItems = items.filter((item) => Boolean(item?.bookId));
+
+  if (validItems.length === 0) {
+    return <p className="text-sm text-muted-foreground">No matches found.</p>;
   }
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {items.map((item) => (
+      {validItems.map((item) => (
         <Card key={item.bookId} className="surface-card rounded-md p-4">
           <div className="grid grid-cols-[88px_1fr] gap-3">
             <div className="relative h-[88px] w-[88px] overflow-hidden border border-border bg-muted">
@@ -34,6 +30,7 @@ export function BookMatches({ items }: BookMatchesProps) {
                   src={item.thumbnailUrl}
                   alt={item.title}
                   fill
+                  unoptimized
                   className="object-cover"
                   sizes="88px"
                 />
