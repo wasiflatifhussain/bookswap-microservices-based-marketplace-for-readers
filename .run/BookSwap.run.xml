@@ -2,6 +2,7 @@
   <configuration default="false" name="BookSwap" type="CompoundRunConfigurationType">
     <toRun name="BackendForFrontendApplication" type="SpringBootApplicationConfigurationType" />
     <toRun name="CatalogServiceApplication" type="SpringBootApplicationConfigurationType" />
+    <toRun name="EmailServiceApplication" type="SpringBootApplicationConfigurationType" />
     <toRun name="MediaServiceApplication" type="SpringBootApplicationConfigurationType" />
     <toRun name="NotificationServiceApplication" type="SpringBootApplicationConfigurationType" />
     <toRun name="SwapServiceApplication" type="SpringBootApplicationConfigurationType" />
