@@ -93,11 +93,29 @@ public class ValuationService {
 
   private Valuation mapToValuationObj(
       BookFinalizedEvent bookFinalizedEvent, GeminiResponse geminiResponse) {
+    // Gemini can return null bookCoins on parse/model errors; keep DB constraint-safe fallback.
+    Float fallbackValue =
+        (bookFinalizedEvent.getValuation() != null && bookFinalizedEvent.getValuation() > 0f)
+            ? bookFinalizedEvent.getValuation()
+            : 0.01f;
+
+    Float resolvedBookCoins =
+        (geminiResponse != null
+                && geminiResponse.getBookCoins() != null
+                && geminiResponse.getBookCoins() > 0f)
+            ? geminiResponse.getBookCoins()
+            : fallbackValue;
+
+    String resolvedComments =
+        (geminiResponse != null && geminiResponse.getComments() != null)
+            ? geminiResponse.getComments()
+            : "AI valuation pending or unavailable.";
+
     return Valuation.builder()
         .bookId(bookFinalizedEvent.getBookId())
         .ownerUserId(bookFinalizedEvent.getOwnerUserId())
-        .bookCoinValue(geminiResponse.getBookCoins())
-        .comments(geminiResponse.getComments())
+        .bookCoinValue(resolvedBookCoins)
+        .comments(resolvedComments)
         .build();
   }
 }
